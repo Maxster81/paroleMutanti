@@ -45,6 +45,7 @@ export function broadcastAPartita(io, gameId, evento, payload) {
  */
 function partitaPerLobby(p) {
   return {
+    id: p.id,
     gameId: p.id,
     creator: p.creator,
     giocatori: p.giocatori,
