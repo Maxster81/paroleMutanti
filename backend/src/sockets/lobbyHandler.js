@@ -8,7 +8,8 @@
  * - 'set_ready' → handleSetReady
  * - 'list_games' → handleListGames
  *
- * Pattern: ogni handler riceve (socket, payload, ack) e usa ack({ok, ...}) per rispondere.
+ * M5-bugfix2: socket tracking con registraSocket/rimuoviSocket per
+ * permettere al sweeper di identificare partite "running con 0 socket".
  *
  * @module backend/src/sockets/lobbyHandler
  */
@@ -29,12 +30,6 @@ const socketToGame = new Map();
 
 /**
  * Broadcast helper: invia evento a tutti i socket presenti in una partita.
- * I socket sono associati alla partita tramite socketToGame.
- *
- * @param {import('socket.io').Server} io
- * @param {string} gameId
- * @param {string} evento
- * @param {object} payload
  */
 export function broadcastAPartita(io, gameId, evento, payload) {
   for (const [socketId, gid] of socketToGame.entries()) {
@@ -45,15 +40,30 @@ export function broadcastAPartita(io, gameId, evento, payload) {
 }
 
 /**
+ * Costruisce un payload completo per la lobby (include tutto il necessario
+ * al frontend per renderizzare la lobby senza re-fetch).
+ */
+function partitaPerLobby(p) {
+  return {
+    gameId: p.id,
+    creator: p.creator,
+    giocatori: p.giocatori,
+    ready: p.ready,
+    state: p.state,
+    vincitore: p.vincitore,
+    params: p.params,
+    currentWord: p.currentWord,         // M5-bugfix: era assente, ora c'è
+    parolaIniziale: p.params.initial_length_min + '-' + p.params.initial_length_max, // placeholder
+    timeLeft: p.turnManager ? Math.max(0, p.turnManager.timeLeft) : null,
+    turno: p.turnManager ? p.turnManager.turno : null,
+  };
+}
+
+/**
  * Attacca gli handler lobby a un socket.
- *
- * @param {import('socket.io').Server} io
- * @param {import('socket.io').Socket} socket
  */
 export function attachLobbyHandlers(io, socket) {
-  // ============================================================
   // create_game
-  // ============================================================
   socket.on('create_game', async (payload, ack) => {
     if (!rateLimiterLobby.check(socket.id)) {
       return ack?.({ ok: false, errore: 'rate_limit', messaggio: 'Troppe richieste, riprova tra poco.' });
@@ -77,14 +87,13 @@ export function attachLobbyHandlers(io, socket) {
 
     socketToGame.set(socket.id, risultato.partita.id);
     socket.join(`lobby:${risultato.partita.id}`);
+    gameManager.registraSocket(risultato.partita.id, socket.id);
 
     logger.info('socket_in_partita', { socketId: socket.id, gameId: risultato.partita.id, nome });
-    ack?.({ ok: true, partita: serializzaPartita(risultato.partita) });
+    ack?.({ ok: true, partita: partitaPerLobby(risultato.partita) });
   });
 
-  // ============================================================
   // join_game
-  // ============================================================
   socket.on('join_game', (payload, ack) => {
     if (!rateLimiterLobby.check(socket.id)) {
       return ack?.({ ok: false, errore: 'rate_limit' });
@@ -102,22 +111,16 @@ export function attachLobbyHandlers(io, socket) {
 
     socketToGame.set(socket.id, gameId);
     socket.join(`lobby:${gameId}`);
+    gameManager.registraSocket(gameId, socket.id);
 
-    // Notifica tutti nella lobby
-    broadcastAPartita(io, gameId, 'lobby_updated', {
-      gameId,
-      giocatori: risultato.partita.giocatori,
-      ready: risultato.partita.ready,
-      state: risultato.partita.state,
-    });
+    // Notifica tutti nella lobby (incluso chi era già dentro)
+    broadcastAPartita(io, gameId, 'lobby_updated', partitaPerLobby(risultato.partita));
 
     logger.info('socket_join', { socketId: socket.id, gameId, nome });
-    ack?.({ ok: true, partita: serializzaPartita(risultato.partita) });
+    ack?.({ ok: true, partita: partitaPerLobby(risultato.partita) });
   });
 
-  // ============================================================
   // leave_game
-  // ============================================================
   socket.on('leave_game', (payload, ack) => {
     const gameId = socketToGame.get(socket.id);
     if (!gameId) return ack?.({ ok: false, errore: 'non_in_partita' });
@@ -128,7 +131,6 @@ export function attachLobbyHandlers(io, socket) {
       return ack?.({ ok: false, errore: 'partita_non_trovata' });
     }
 
-    // Se in waiting: rimuovi il giocatore
     if (partita.state === 'waiting') {
       const idx = partita.giocatori.findIndex((g) => g === payload?.nome);
       if (idx !== -1) {
@@ -137,25 +139,19 @@ export function attachLobbyHandlers(io, socket) {
         if (partita.giocatori.length === 0) {
           gameManager.rimuoviPartita(gameId);
         } else {
-          broadcastAPartita(io, gameId, 'lobby_updated', {
-            gameId,
-            giocatori: partita.giocatori,
-            ready: partita.ready,
-            state: partita.state,
-          });
+          broadcastAPartita(io, gameId, 'lobby_updated', partitaPerLobby(partita));
         }
       }
     }
 
     socketToGame.delete(socket.id);
+    gameManager.rimuoviSocket(gameId, socket.id);
     socket.leave(`lobby:${gameId}`);
     logger.info('socket_leave', { socketId: socket.id, gameId });
     ack?.({ ok: true });
   });
 
-  // ============================================================
   // set_ready
-  // ============================================================
   socket.on('set_ready', async (payload, ack) => {
     const gameId = socketToGame.get(socket.id);
     if (!gameId) return ack?.({ ok: false, errore: 'non_in_partita' });
@@ -166,12 +162,7 @@ export function attachLobbyHandlers(io, socket) {
       return ack?.({ ok: false, errore: risultato.errore });
     }
 
-    broadcastAPartita(io, gameId, 'lobby_updated', {
-      gameId,
-      giocatori: risultato.partita.giocatori,
-      ready: risultato.partita.ready,
-      state: risultato.partita.state,
-    });
+    broadcastAPartita(io, gameId, 'lobby_updated', partitaPerLobby(risultato.partita));
 
     ack?.({ ok: true, tuttiProni: risultato.tuttiProni });
 
@@ -179,12 +170,10 @@ export function attachLobbyHandlers(io, socket) {
     if (risultato.tuttiProni) {
       const avvio = await gameManager.avviaPartita(gameId);
       if (avvio.ok) {
-        // Switch socket dalla lobby alla game room
         const partita = avvio.partita;
-        const io_ = io;
         for (const [sid, gid] of socketToGame.entries()) {
           if (gid === gameId) {
-            const s = io_.sockets.sockets.get(sid);
+            const s = io.sockets.sockets.get(sid);
             if (s) {
               s.leave(`lobby:${gameId}`);
               s.join(`game:${gameId}`);
@@ -207,54 +196,23 @@ export function attachLobbyHandlers(io, socket) {
     }
   });
 
-  // ============================================================
   // list_games
-  // ============================================================
   socket.on('list_games', (payload, ack) => {
-    const partite = gameManager.listaPartiteAperte().map(serializzaPartita);
+    const partite = gameManager.listaPartiteAperte().map(partitaPerLobby);
     ack?.({ ok: true, partite });
   });
 
-  // ============================================================
   // Disconnect: cleanup
-  // ============================================================
   socket.on('disconnect', () => {
     const gameId = socketToGame.get(socket.id);
     if (gameId) {
       const partita = gameManager.getPartita(gameId);
       if (partita && partita.state === 'waiting') {
-        // Rimuovi socket dalla mappa ma lascia partita
-        broadcastAPartita(io, gameId, 'lobby_updated', {
-          gameId,
-          giocatori: partita.giocatori,
-          ready: partita.ready,
-          state: partita.state,
-        });
+        broadcastAPartita(io, gameId, 'lobby_updated', partitaPerLobby(partita));
       }
+      gameManager.rimuoviSocket(gameId, socket.id);
       socketToGame.delete(socket.id);
     }
     logger.info('socket_disconnect', { socketId: socket.id, gameId });
   });
-}
-
-/**
- * Serializza una partita per il client (rimuove oggetti interni).
- *
- * @param {object} partita
- * @returns {object}
- */
-function serializzaPartita(partita) {
-  return {
-    id: partita.id,
-    creator: partita.creator,
-    giocatori: partita.giocatori,
-    ready: partita.ready,
-    state: partita.state,
-    params: partita.params,
-    currentWord: partita.currentWord,
-    vincitore: partita.vincitore,
-    createdAt: partita.createdAt,
-    startedAt: partita.startedAt,
-    endedAt: partita.endedAt,
-  };
 }

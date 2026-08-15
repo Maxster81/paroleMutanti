@@ -5,11 +5,13 @@
  * Re-render reattivo su cambi di state E di route.
  *
  * **M5-bugfix**: al boot, se c'è un gameId in localStorage, tenta di
- * ripristinare la partita (chiama request_state al server).
+ * ripristinare la partita. M5-bugfix2: aspetta connessione socket
+ * PRIMA di chiamare request_state, mostra overlay "Caricamento...",
+ * alert chiaro se la partita non esiste più.
  */
 
 import { state } from './state.js';
-import { connect as socketConnect, on as socketOn, emit } from './socket.js';
+import { connect as socketConnect, on as socketOn, emit, getSocket } from './socket.js';
 import { click as audioClick, beep, tick as audioTick } from './audio.js';
 import { healthCheck } from './api.js';
 import { route, start as routerStart, onRouteChange, navigate } from './router.js';
@@ -104,6 +106,28 @@ onRouteChange((renderFn, params) => {
 });
 
 /* ============================================================
+   Overlay "Caricamento partita..."
+   ============================================================ */
+function mostraOverlay(testo) {
+  let ov = document.getElementById('pm-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'pm-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    ov.innerHTML = `<div style="background:var(--bg-elevated);padding:2rem;border-radius:12px;text-align:center;"><div class="loading">${testo}</div></div>`;
+    document.body.appendChild(ov);
+  } else {
+    ov.querySelector('.loading').textContent = testo;
+  }
+  ov.style.display = 'flex';
+}
+
+function nascondiOverlay() {
+  const ov = document.getElementById('pm-overlay');
+  if (ov) ov.style.display = 'none';
+}
+
+/* ============================================================
    Socket events → state + re-render
    ============================================================ */
 socketOn('lobby_updated', (data) => {
@@ -116,6 +140,7 @@ socketOn('lobby_updated', (data) => {
 socketOn('partita_avviata', (data) => {
   console.log('[main] partita_avviata', data);
   state.update({ partita: { ...data, state: 'running' } });
+  nascondiOverlay();
   navigate(`#game?gameId=${data.gameId}`);
 });
 
@@ -143,9 +168,7 @@ socketOn('tick', (data) => {
   }
 });
 
-socketOn('beep', () => {
-  audioTick();
-});
+socketOn('beep', () => audioTick());
 
 socketOn('mossa_rifiutata', (data) => {
   const errorBox = document.getElementById('submit-error');
@@ -166,7 +189,6 @@ socketOn('giocatore_eliminato', (data) => {
 socketOn('game_over', (data) => {
   state.update({ partita: { ...data, state: 'finished' } });
   alert(`🏆 Vince: ${data.vincitore}!\n\nDurata: ${(data.durataMs / 1000).toFixed(1)}s\nTurni totali: ${data.history.length}`);
-  // Pulisci localStorage (partita finita, non rientrare)
   state.update({ gameId: null, partita: null });
   navigate('#home');
 });
@@ -178,36 +200,60 @@ socketOn('partita_cancellata', () => {
 });
 
 /* ============================================================
-   Ripristino partita al boot (M5-bugfix)
+   Ripristino partita al boot (M5-bugfix2)
    ============================================================ */
 async function tentaRipristinoPartita() {
   const gameIdSalvato = localStorage.getItem('pm-gameId');
-  if (!gameIdSalvato) return false; // niente da ripristinare
+  if (!gameIdSalvato) return false;
 
   const nomeSalvato = localStorage.getItem('pm-nome') || '';
   console.log('[main] tentativo ripristino partita:', gameIdSalvato);
 
+  // Aspetta connessione socket PRIMA di chiamare request_state
+  const sock = getSocket();
+  if (!sock || !sock.connected) {
+    console.log('[main] socket non connesso, attendo...');
+    await new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        const s = getSocket();
+        if (s && s.connected) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 200);
+      setTimeout(() => { clearInterval(checkInterval); resolve(); }, 3000);
+    });
+  }
+
+  mostraOverlay('Ripristino partita in corso…');
+
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       console.warn('[main] timeout ripristino partita');
+      nascondiOverlay();
+      alert('Connessione lenta, riprova più tardi');
+      localStorage.removeItem('pm-gameId');
+      state.update({ gameId: null, partita: null });
+      routerStart();
       resolve(false);
     }, 5000);
 
     emit('request_state', { gameId: gameIdSalvato, nome: nomeSalvato }, (resp) => {
       clearTimeout(timeout);
+      nascondiOverlay();
       if (!resp || !resp.ok || !resp.stato) {
         console.log('[main] partita non recuperabile:', resp?.errore || 'risposta vuota');
-        // Pulisci localStorage
+        // M5-bugfix2: alert chiaro + pulizia + vai a home
+        alert(`La partita ${gameIdSalvato.slice(0, 8)}… non esiste più sul server.\nVerrai reindirizzato alla home.`);
         localStorage.removeItem('pm-gameId');
         state.update({ gameId: null, partita: null });
+        navigate('#home');
         resolve(false);
         return;
       }
-      // Partita recuperata
       console.log('[main] partita recuperata:', resp);
-      state.update({ gameId: gameIdSalvato, partita: resp });
-      // Naviga alla view giusta
-      if (resp.state === 'running') {
+      state.update({ gameId: gameIdSalvato, partita: resp.stato });
+      if (resp.stato.state === 'running') {
         navigate(`#game?gameId=${gameIdSalvato}`);
       } else {
         navigate(`#lobby?gameId=${gameIdSalvato}`);
@@ -226,14 +272,23 @@ async function tentaRipristinoPartita() {
 
   socketConnect();
 
-  // Aspetta un attimo per la connessione socket prima di chiedere request_state
-  await new Promise((r) => setTimeout(r, 500));
+  // M5-bugfix2: aspetta connessione prima di qualsiasi cosa
+  await new Promise((resolve) => {
+    const sock = getSocket();
+    if (sock && sock.connected) return resolve();
+    const interval = setInterval(() => {
+      const s = getSocket();
+      if (s && s.connected) {
+        clearInterval(interval);
+        resolve();
+      }
+    }, 200);
+    setTimeout(() => { clearInterval(interval); resolve(); }, 3000);
+  });
 
-  // Prova a ripristinare una partita precedente (se in localStorage)
+  // Prova a ripristinare una partita precedente
   const ripristinata = await tentaRipristinoPartita();
   if (!ripristinata) {
-    // Nessuna partita precedente, avvia router normalmente
     routerStart();
   }
-  // Se ripristinata, il router è già stato avviato implicitamente dal navigate
 })();

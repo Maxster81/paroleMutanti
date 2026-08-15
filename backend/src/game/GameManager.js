@@ -4,7 +4,10 @@
  * Singleton che tiene traccia di tutte le partite attive in memoria.
  * Ogni partita è identificata da un gameId (UUID).
  *
- * M3: orchestrazione validazione AI con pause/resume TurnManager.
+ * M5-bugfix2: include sweeper automatico per partite abbandonate:
+ * - waiting >5min → cancellata
+ * - running con 0 socket >2min → cancellata
+ * - finished >1min → rimossa
  *
  * @module backend/src/game/GameManager
  */
@@ -17,10 +20,22 @@ import { scegliParolaIniziale } from './WordPicker.js';
 import { validaMossa } from './Validator.js';
 import { TurnManager } from './TurnManager.js';
 
+// Intervalli sweeper (ms)
+const TIMEOUT_WAITING_MS = 5 * 60 * 1000;       // 5 min
+const TIMEOUT_RUNNING_SOLO_MS = 2 * 60 * 1000;   // 2 min
+const TIMEOUT_FINISHED_MS = 60 * 1000;             // 1 min
+const SWEEPER_INTERVAL_MS = 60 * 1000;             // ogni 1 min
+
 export class GameManager extends EventEmitter {
   constructor() {
     super();
     this.partite = new Map();
+    // Traccia socket connessi per partita (per sweeper "running con 0 socket")
+    this.socketsPerPartita = new Map(); // gameId → Set<socketId>
+
+    // Sweeper automatico
+    this.sweeperInterval = setInterval(() => this._sweepAbbandonate(), SWEEPER_INTERVAL_MS);
+    this.sweeperInterval.unref(); // non blocca shutdown
   }
 
   // ============================================================
@@ -70,9 +85,11 @@ export class GameManager extends EventEmitter {
       createdAt: new Date(),
       startedAt: null,
       endedAt: null,
+      lastActivityAt: new Date(),
       aiValidationsCount: 0,
     };
     this.partite.set(id, partita);
+    this.socketsPerPartita.set(id, new Set());
     logger.info('partita_creata', { id, creator: nome, maxPlayers, turnSeconds });
     this.emit('partita_creata', partita);
     return { ok: true, partita };
@@ -83,11 +100,16 @@ export class GameManager extends EventEmitter {
     if (!partita) return { ok: false, errore: 'partita_non_trovata' };
     if (partita.state !== 'waiting') return { ok: false, errore: 'partita_gia_iniziata' };
     if (partita.giocatori.length >= partita.params.max_players) return { ok: false, errore: 'partita_piena' };
-    if (!nome || typeof nome !== 'string' || nome.trim().length < 1) return { ok: false, errore: 'nome_non_valido' };
+    if (!nome || typeof nome !== 'string' || nome.trim().length < 1) {
+      return { ok: false, errore: 'nome_non_valido' };
+    }
     const nomePulito = nome.trim();
-    if (partita.giocatori.includes(nomePulito)) return { ok: false, errore: 'nome_gia_usato' };
+    if (partita.giocatori.includes(nomePulito)) {
+      return { ok: false, errore: 'nome_gia_usato' };
+    }
     partita.giocatori.push(nomePulito);
     partita.ready.push(false);
+    partita.lastActivityAt = new Date();
     logger.info('giocatore_aggiunto', { gameId, nome: nomePulito, totale: partita.giocatori.length });
     this.emit('giocatore_aggiunto', partita);
     return { ok: true, partita };
@@ -100,6 +122,7 @@ export class GameManager extends EventEmitter {
     const idx = partita.giocatori.indexOf(nome);
     if (idx === -1) return { ok: false, errore: 'giocatore_non_in_partita' };
     partita.ready[idx] = ready;
+    partita.lastActivityAt = new Date();
     const tuttiProni = partita.ready.every((r) => r) && partita.giocatori.length >= 2;
     logger.info('ready_aggiornato', { gameId, nome, ready, tuttiProni });
     this.emit('ready_aggiornato', partita);
@@ -136,6 +159,7 @@ export class GameManager extends EventEmitter {
       partita.startedAt = new Date();
       partita.currentPlayerIndex = 0;
       partita.history = [{ parola: parolaIniziale, giocatore: '(iniziale)', turno: 0, timestamp: Date.now() }];
+      partita.lastActivityAt = new Date();
 
       const turnManager = new TurnManager({
         giocatori: [...partita.giocatori],
@@ -163,47 +187,15 @@ export class GameManager extends EventEmitter {
     }
   }
 
-  /**
-   * Gestisce submit di una parola.
-   * M3: pausa il timer se serve validazione AI.
-   */
   async submitParola(gameId, nomeGiocatore, parola) {
     const partita = this.partite.get(gameId);
     if (!partita) return { ok: false, valida: false, motivo: 'partita_non_trovata' };
-    if (partita.state !== 'running') return { ok: false, valida: false, motivo: 'partita_non_in_corso' };
+    if (partita.state !== 'running') {
+      return { ok: false, valida: false, motivo: 'partita_non_in_corso' };
+    }
     if (partita.turnManager.giocatoreCorrente() !== nomeGiocatore) {
       return { ok: false, valida: false, motivo: 'non_sei_di_turno' };
     }
-
-    // Ottimizzazione: proviamo prima la validazione SENZA AI
-    // e solo se necessario mettiamo in pausa
-    const validazioneResult = await this._validaConPausa(gameId, partita, parola, nomeGiocatore);
-
-    return {
-      ok: true,
-      valida: validazioneResult.valida,
-      motivo: validazioneResult.motivo,
-      messaggio: validazioneResult.messaggio,
-      source: validazioneResult.source,
-    };
-  }
-
-  /**
-   * Validazione con gestione pause/resume TurnManager per chiamate AI.
-   * @private
-   */
-  async _validaConPausa(gameId, partita, parola, nomeGiocatore) {
-    // Pre-checks leggeri (charset, distanza, DB): nessuna pausa necessaria
-    // perché veloci (< 50ms). Se serve AI, mettiamo in pausa.
-
-    // Per minimizzare impatto: chiamiamo Validator e basta
-    // Validator restituisce se ha usato AI internamente; in tal caso
-    // segnaliamo al client con un evento separato.
-    // Per semplicità M3, mettiamo in pausa SOLO se attiviamo AI (cache miss + rate ok).
-
-    // Per il primo cut: chiamiamo direttamente. Il timer gira.
-    // Latenza AI ~343ms è accettabile dato che timeout turno è >= 5s.
-    // Per pause/resume esplicito: vedi sotto (futuro).
 
     const risultato = await validaMossa({
       parolaPrecedente: partita.currentWord,
@@ -222,15 +214,22 @@ export class GameManager extends EventEmitter {
         turno: partita.turnManager.turno,
         timestamp: Date.now(),
       });
+      partita.lastActivityAt = new Date();
       if (risultato.source === 'AI') partita.aiValidationsCount += 1;
       this.emit('mossa_validata', { gameId, partita, parola: risultato.normalizzata, ai_usata: risultato.ai_usata || false });
       logger.info('mossa_validata', { gameId, giocatore: nomeGiocatore, source: risultato.source, ai_usata: !!risultato.ai_usata });
     } else {
       this.emit('mossa_rifiutata', { gameId, partita, parola, motivo: risultato.motivo });
-      logger.info('mossa_rifiutata', { gameId, giocatore: nomeGiocatore, motivo: risultato.motivo });
+      logger.info('mossa_rifiutata', { gameId, giocatore: nomeGiocatore, parola, motivo: risultato.motivo });
     }
 
-    return risultato;
+    return {
+      ok: true,
+      valida: risultato.valida,
+      motivo: risultato.motivo,
+      messaggio: risultato.messaggio,
+      source: risultato.source,
+    };
   }
 
   passaTurno(gameId, nomeGiocatore) {
@@ -276,6 +275,7 @@ export class GameManager extends EventEmitter {
     partita.state = 'finished';
     partita.vincitore = vincitore;
     partita.endedAt = new Date();
+    partita.lastActivityAt = new Date();
     if (partita.turnManager) partita.turnManager.stop();
     logger.info('partita_finita', { gameId, vincitore, durata_ms: partita.endedAt - partita.startedAt, aiValidations: partita.aiValidationsCount });
     this.emit('partita_finita', partita);
@@ -291,12 +291,68 @@ export class GameManager extends EventEmitter {
     this.emit('partita_cancellata', partita);
   }
 
+  // ============================================================
+  // Socket tracking (per sweeper "running con 0 socket")
+  // ============================================================
+
+  registraSocket(gameId, socketId) {
+    if (!this.socketsPerPartita.has(gameId)) {
+      this.socketsPerPartita.set(gameId, new Set());
+    }
+    this.socketsPerPartita.get(gameId).add(socketId);
+  }
+
+  rimuoviSocket(gameId, socketId) {
+    this.socketsPerPartita.get(gameId)?.delete(socketId);
+  }
+
+  contaSocket(gameId) {
+    return this.socketsPerPartita.get(gameId)?.size ?? 0;
+  }
+
+  // ============================================================
+  // Sweeper automatico
+  // ============================================================
+
+  /**
+   * Pulisce partite abbandonate secondo regole:
+   * - waiting >5min → cancellata
+   * - running con 0 socket >2min → cancellata
+   * - finished >1min → rimossa definitivamente
+   */
+  _sweepAbbandonate() {
+    const ora = Date.now();
+    for (const [gameId, p] of this.partite.entries()) {
+      if (p.state === 'waiting') {
+        const etaMs = ora - new Date(p.createdAt).getTime();
+        if (etaMs > TIMEOUT_WAITING_MS) {
+          logger.info('sweeper_cancella_waiting', { gameId, etaMin: Math.round(etaMs / 60000) });
+          this._cancellaPartita(gameId);
+        }
+      } else if (p.state === 'running') {
+        const etaSenzaAttivita = ora - new Date(p.lastActivityAt).getTime();
+        const socketConnessi = this.contaSocket(gameId);
+        if (socketConnessi === 0 && etaSenzaAttivita > TIMEOUT_RUNNING_SOLO_MS) {
+          logger.info('sweeper_cancella_running_solo', { gameId, etaMin: Math.round(etaSenzaAttivita / 60000) });
+          this._cancellaPartita(gameId);
+        }
+      } else if (p.state === 'finished' || p.state === 'cancelled') {
+        const etaFine = ora - new Date(p.endedAt).getTime();
+        if (etaFine > TIMEOUT_FINISHED_MS) {
+          logger.info('sweeper_rimuove_finita', { gameId, etaSec: Math.round(etaFine / 1000) });
+          this.rimuoviPartita(gameId);
+        }
+      }
+    }
+  }
+
   rimuoviPartita(gameId) {
     const partita = this.partite.get(gameId);
     if (!partita) return false;
     if (partita.state === 'running') return false;
     if (partita.turnManager) partita.turnManager.stop();
     this.partite.delete(gameId);
+    this.socketsPerPartita.delete(gameId);
     logger.info('partita_rimossa', { gameId });
     this.emit('partita_rimossa', { id: gameId });
     return true;
