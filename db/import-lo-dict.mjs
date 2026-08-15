@@ -9,7 +9,7 @@
  * Strategia:
  *   - Download it_IT.dic da GitHub (encoding UTF-8 dichiarato)
  *   - Parsing: split su "/" per estrarre solo la parola base
- *   - Filtro: lunghezza 3-10, charset italiano (a-z + àèéìòù)
+ *   - Filtro: lunghezza 3-10, charset italiano (a-z + àèéìòù + j, k, w, x, y) + apostrofo
  *   - Dedup con Set
  *   - INSERT batch con ON CONFLICT DO NOTHING
  *   - source='LO' (LibreOffice)
@@ -25,8 +25,8 @@ const TMP_FILE = '/tmp/it_IT.dic';
 const MIN_LENGTH = 3;
 const MAX_LENGTH = 10;
 
-const RE_LETTERE_STRANIERE = /[jkwxy]/;
-const RE_CHARSET = /^[a-zàèéìòù']+$/;
+// Charset: lettere italiane + prestiti consolidati (wifi, weekend, jazz, kiwi, yogurt)
+const RE_CHARSET = /^[a-zàèéìòùjkwxy']+$/;
 
 async function download() {
   console.log(`[import-lo] Download da: ${DICT_URL}`);
@@ -50,7 +50,6 @@ function parseLine(linea) {
 function validaParola(parola) {
   if (!parola) return null;
   if (parola.length < MIN_LENGTH || parola.length > MAX_LENGTH) return null;
-  if (RE_LETTERE_STRANIERE.test(parola)) return null;
   if (!RE_CHARSET.test(parola)) return null;
   return parola;
 }
@@ -64,7 +63,6 @@ async function importToDb(setParole) {
 
   for (let i = 0; i < paroleArray.length; i += BATCH) {
     const batch = paroleArray.slice(i, i + BATCH);
-    // 2 parametri per riga: word, length. source='LO' hardcoded.
     const values = [];
     const placeholders = [];
     batch.forEach((p, j) => {

@@ -8,8 +8,8 @@
  *
  * Strategia:
  *   - Download dictionary_sorted.json (~95MB)
- *   - Parse JSON streaming (no caricamento intero in memoria)
- *   - Filtro: lunghezza 3-10, charset italiano (a-z + àèéìòù)
+ *   - Parse JSON
+ *   - Filtro: lunghezza 3-10, charset italiano (a-z + àèéìòù + jkwxy) + apostrofo
  *   - Dedup con Set
  *   - INSERT con ON CONFLICT DO NOTHING (source='HF')
  *
@@ -24,8 +24,8 @@ const TMP_FILE = '/tmp/dict_hf.json';
 const MIN_LENGTH = 3;
 const MAX_LENGTH = 10;
 
-const RE_LETTERE_STRANIERE = /[jkwxy]/;
-const RE_CHARSET = /^[a-zàèéìòù']+$/;
+// Charset: lettere italiane + prestiti consolidati
+const RE_CHARSET = /^[a-zàèéìòùjkwxy']+$/;
 
 async function download() {
   console.log(`[import-hf] Download da: ${DICT_URL}`);
@@ -44,7 +44,6 @@ async function download() {
 function validaParola(parola) {
   if (!parola) return null;
   if (parola.length < MIN_LENGTH || parola.length > MAX_LENGTH) return null;
-  if (RE_LETTERE_STRANIERE.test(parola)) return null;
   if (!RE_CHARSET.test(parola)) return null;
   return parola;
 }

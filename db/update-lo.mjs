@@ -2,11 +2,9 @@
  * update-lo.mjs — Aggiorna dizionario LO con incrementale
  *
  * Strategia:
- *   1. Legge l'ETag locale da .last-etag-lo
- *   2. Scarica it_IT.dic (salva in /tmp)
- *   3. Parsing + filtro (come import-lo-dict.mjs)
- *   4. INSERT con ON CONFLICT DO NOTHING (solo parole nuove)
- *   5. Aggiorna .last-etag-lo
+ *   1. Scarica it_IT.dic (salva in /tmp)
+ *   2. Parsing + filtro (come import-lo-dict.mjs)
+ *   3. INSERT con ON CONFLICT DO NOTHING (solo parole nuove)
  *
  * Uso: node db/update-lo.mjs
  *
@@ -14,26 +12,19 @@
  */
 
 import { writeFile, readFile, unlink } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { query } from '../backend/src/db/pool.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const ETAG_FILE = join(__dirname, '.last-etag-lo');
 
 const DICT_URL = 'https://raw.githubusercontent.com/LibreOffice/dictionaries/master/it_IT/it_IT.dic';
 const TMP_FILE = '/tmp/it_IT.dic';
 const MIN_LENGTH = 3;
 const MAX_LENGTH = 10;
 
-const RE_LETTERE_STRANIERE = /[jkwxy]/;
-const RE_CHARSET = /^[a-zàèéìòù']+$/;
+// Charset: lettere italiane + prestiti consolidati
+const RE_CHARSET = /^[a-zàèéìòùjkwxy']+$/;
 
 function validaParola(parola) {
   if (!parola) return null;
   if (parola.length < MIN_LENGTH || parola.length > MAX_LENGTH) return null;
-  if (RE_LETTERE_STRANIERE.test(parola)) return null;
   if (!RE_CHARSET.test(parola)) return null;
   return parola;
 }
@@ -44,23 +35,12 @@ function parseLine(linea) {
   return idx === -1 ? linea : linea.substring(0, idx);
 }
 
-async function getEtag(url) {
-  const response = await fetch(url, { method: 'HEAD' });
-  if (!response.ok) throw new Error(`HEAD fallito: ${response.status}`);
-  return response.headers.get('etag');
-}
-
 async function main() {
-  console.log('[update-lo] Controllo ETag remoto...');
-  const etagRemoto = await getEtag(DICT_URL);
-  console.log(`[update-lo] ETag remoto: ${etagRemoto}`);
-
-  // Salva ETag
-  await writeFile(ETAG_FILE, etagRemoto, 'utf-8');
-
-  // Download
   console.log('[update-lo] Download dizionario...');
   const response = await fetch(DICT_URL);
+  if (!response.ok) {
+    throw new Error(`Download fallito: ${response.status} ${response.statusText}`);
+  }
   const buffer = Buffer.from(await response.arrayBuffer());
   await writeFile(TMP_FILE, buffer);
   console.log(`[update-lo] Scaricato ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
@@ -91,7 +71,7 @@ async function main() {
       placeholders.push(`($${j * 2 + 1}, $${j * 2 + 2}, 'LO')`);
       values.push(p, p.length);
     });
-    const result = await query(
+    await query(
       `INSERT INTO words (word, length, source) VALUES ${placeholders.join(', ')} ON CONFLICT (word) DO NOTHING`,
       values
     );

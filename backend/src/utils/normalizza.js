@@ -3,30 +3,23 @@
  *
  * Usato dal Validator per preparare la parola prima della validazione.
  * - lowercase + trim
- * - charset italiano (lettere a-z esclusa jkwxy, accentate, apostrofo)
+ * - charset italiano (lettere a-z, accentate, apostrofo) + prestiti consolidati (j, k, w, x, y)
  * - lunghezza entro range
  *
  * @module backend/src/utils/normalizza
  */
 
 /**
- * Espressione regolare per lettere italiane.
- * - Lettere base: a-z
- * - Escluse lettere straniere comuni: j, k, w, x, y (rarissime/assenti in italiano)
- * - Accenti italiani: à, è, é, ì, ò, ù
+ * Espressione regolare per lettere italiane + prestiti consolidati.
+ * Include: a-z, àèéìòù (accenti), apostrofo, jkwxy (parole straniere ormai
+ * di uso comune in italiano: wifi, weekend, jazz, kiwi, yogurt, ecc.)
  */
-const RE_CHARSET_ITALIANO = /^[a-zàèéìòù]+$/;
+const RE_CHARSET_ITALIANO = /^[a-zàèéìòùjkwxy]+$/;
 
 /**
  * Espressione regolare per lettere italiane con apostrofo opzionale.
- * Accettiamo l'apostrofo per casi tipo "c'e'" (rari).
  */
-const RE_CHARSET_CON_APOSTROFO = /^[a-zàèéìòù']+$/;
-
-/**
- * Lettere straniere da rifiutare (non appartengono all'italiano standard).
- */
-const RE_LETTERE_STRANIERE = /[jkwxy]/;
+const RE_CHARSET_CON_APOSTROFO = /^[a-zàèéìòùjkwxy']+$/;
 
 /**
  * Normalizza una stringa di input: lowercase, trim, no caratteri strani.
@@ -41,8 +34,7 @@ export function normalizzaBase(input) {
 
 /**
  * Verifica se una parola è valida per il gioco:
- * - Solo lettere italiane (a-z + accenti) o lettere + apostrofo
- * - Esclude lettere straniere (j, k, w, x, y)
+ * - Solo lettere italiane (a-z + accenti + prestiti j, k, w, x, y) o lettere + apostrofo
  * - Lunghezza entro [min, max]
  *
  * Ritorna un oggetto con:
@@ -68,11 +60,6 @@ export function validaParola(input, min, max) {
 
   if (normalizzata.length > max) {
     return { valida: false, motivo: 'troppo_lunga', normalizzata };
-  }
-
-  // Rifiuta lettere straniere (j, k, w, x, y) prima del check charset generico
-  if (RE_LETTERE_STRANIERE.test(normalizzata)) {
-    return { valida: false, motivo: 'caratteri_non_validi', normalizzata };
   }
 
   if (!RE_CHARSET_ITALIANO.test(normalizzata) && !RE_CHARSET_CON_APOSTROFO.test(normalizzata)) {

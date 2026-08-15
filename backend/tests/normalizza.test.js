@@ -2,6 +2,9 @@
  * Test unit per le funzioni di normalizzazione e validazione parole.
  *
  * Esegue con: node --test backend/tests/normalizza.test.js
+ *
+ * Note M4b-fix: dal dizionario ibrido (LO+HF), lettere j, k, w, x, y sono
+ * ammesse perché fanno parte di prestiti consolidati (wifi, weekend, jazz, kiwi, yogurt).
  */
 
 import { test } from 'node:test';
@@ -40,18 +43,31 @@ test('validaParola: lowercase + trim automatici', () => {
 });
 
 test('validaParola: accenti italiani accettati', () => {
-  const r1 = validaParola('città', 3, 10);
-  assert.equal(r1.valida, true);
-  const r2 = validaParola('perché', 3, 10);
-  assert.equal(r2.valida, true);
-  const r3 = validaParola('gioì', 3, 10);
-  assert.equal(r3.valida, true);
+  assert.equal(validaParola('città', 3, 10).valida, true);
+  assert.equal(validaParola('perché', 3, 10).valida, true);
+  assert.equal(validaParola('gioì', 3, 10).valida, true);
 });
 
 test('validaParola: apostrofo accettato (raro ma valido)', () => {
-  // Casi tipo "c'e'" sono rari ma possibili
-  const r = validaParola("c'e'", 3, 10);
-  assert.equal(r.valida, true);
+  assert.equal(validaParola("c'e'", 3, 10).valida, true);
+});
+
+// === M4b-fix: prestiti consolidati con lettere straniere sono accettati ===
+test('validaParola: M4b-fix - parole con lettere straniere comuni accettate', () => {
+  // Wifi, weekend, jazz, kiwi, yogurt, etc. sono ormai nell'italiano comune
+  assert.equal(validaParola('wifi', 3, 10).valida, true);
+  assert.equal(validaParola('wifi', 3, 10).motivo, null);
+  assert.equal(validaParola('weekend', 3, 10).valida, true);
+  assert.equal(validaParola('jazz', 3, 10).valida, true);
+  assert.equal(validaParola('kiwi', 3, 10).valida, true);
+  assert.equal(validaParola('yogurt', 3, 10).valida, true);
+  assert.equal(validaParola('kimono', 3, 10).valida, true);
+  assert.equal(validaParola('jeans', 3, 10).valida, true);
+  assert.equal(validaParola('web', 3, 10).valida, true);
+  assert.equal(validaParola('xilofono', 3, 10).valida, true);
+  // Anche combinate
+  assert.equal(validaParola('selfie', 3, 10).valida, true);  // già esistente
+  assert.equal(validaParola('smartphone', 3, 10).valida, true);  // già esistente
 });
 
 test('validaParola: rifiutata se troppo corta', () => {
@@ -92,13 +108,6 @@ test('validaParola: rifiutata per caratteri non validi (simboli)', () => {
 
 test('validaParola: rifiutata per caratteri non validi (spazi interni)', () => {
   const r = validaParola('casa mia', 3, 10);
-  assert.equal(r.valida, false);
-  assert.equal(r.motivo, 'caratteri_non_validi');
-});
-
-test('validaParola: rifiutata per caratteri non validi (lettere straniere)', () => {
-  // 'w' non è in italiano
-  const r = validaParola('wifi', 3, 10);
   assert.equal(r.valida, false);
   assert.equal(r.motivo, 'caratteri_non_validi');
 });
