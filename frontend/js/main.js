@@ -1,21 +1,27 @@
 /**
  * main.js — Entry point del frontend
  *
- * Bootstrap: state, socket, audio, render home.
- * View switching completo in M4.3+.
+ * Bootstrap: state, socket, audio, router, view rendering.
+ * Re-render reattivo su cambi di state E di route.
  */
 
 import { state } from './state.js';
 import { connect as socketConnect, on as socketOn } from './socket.js';
 import { click as audioClick, beep } from './audio.js';
 import { healthCheck } from './api.js';
+import { route, start as routerStart, onRouteChange, navigate } from './router.js';
+
+import { renderHome, attachHomeHandlers } from './views/home.js';
+import { renderCreate, attachCreateHandlers } from './views/create.js';
+import { renderJoin, attachJoinHandlers } from './views/join.js';
+import { renderLobby, attachLobbyHandlers } from './views/lobby.js';
 
 console.log('[main] Parole Mutanti frontend avviato');
 
 const app = document.getElementById('app');
 
 /* ============================================================
-   Status dot connessione
+   Header: status dot, theme toggle, sound toggle
    ============================================================ */
 const statusDot = document.getElementById('connection-status');
 function refreshStatusDot(connessione) {
@@ -29,9 +35,6 @@ function refreshStatusDot(connessione) {
   }[connessione] || '';
 }
 
-/* ============================================================
-   Theme toggle
-   ============================================================ */
 const themeToggle = document.getElementById('theme-toggle');
 const SOUND_KEY = 'pm-audio';
 const THEME_KEY = 'pm-tema';
@@ -54,31 +57,22 @@ function toggleTheme() {
 if (themeToggle) {
   themeToggle.addEventListener('click', toggleTheme);
 }
-
-// Applica tema iniziale
 document.documentElement.setAttribute('data-theme', state.get().tema);
 refreshThemeIcon();
 
-/* ============================================================
-   Sound toggle
-   ============================================================ */
 const soundToggle = document.getElementById('sound-toggle');
 function refreshSoundIcon() {
   if (!soundToggle) return;
   const attivo = state.get().audioAbilitato;
   soundToggle.textContent = attivo ? '🔊' : '🔇';
-  soundToggle.title = attivo ? 'Audio attivo (clicca per disattivare)' : 'Audio disattivato (clicca per attivare)';
+  soundToggle.title = attivo ? 'Audio attivo' : 'Audio disattivato';
 }
 
 function toggleSound() {
-  // Niente audioClick (sennò si attiverebbe da solo)
   const nuovo = !state.get().audioAbilitato;
   localStorage.setItem(SOUND_KEY, nuovo ? 'on' : 'off');
   state.update({ audioAbilitato: nuovo });
-  if (nuovo) {
-    // Beep di conferma attivazione
-    setTimeout(() => beep(880, 100), 50);
-  }
+  if (nuovo) setTimeout(() => beep(880, 100), 50);
 }
 
 if (soundToggle) {
@@ -87,72 +81,71 @@ if (soundToggle) {
 refreshSoundIcon();
 
 /* ============================================================
-   Reactivity: re-render su state change
+   Router: registrazione routes + render reattivo
    ============================================================ */
-function render() {
+route('#home', renderHome);
+route('#create', renderCreate);
+route('#join', renderJoin);
+route('#lobby', renderLobby);
+
+onRouteChange((renderFn, params) => {
+  // Renderizza la view
+  app.innerHTML = renderFn(params);
+
+  // Refresh header dinamici
   refreshStatusDot(state.get().connessione);
   refreshThemeIcon();
   refreshSoundIcon();
-  // Home placeholder (M4.3 sostituirà con router)
-  app.innerHTML = renderHome();
-}
 
-state.subscribe(render);
+  // Attach handlers specifici per view corrente
+  const routeCorrente = location.hash.split('?')[0] || '#home';
+  switch (routeCorrente) {
+    case '#home': attachHomeHandlers(); break;
+    case '#create': attachCreateHandlers(); break;
+    case '#join': attachJoinHandlers(); break;
+    case '#lobby': attachLobbyHandlers(); break;
+  }
+});
 
 /* ============================================================
-   Home placeholder (M4.3)
+   Setup routes eventi Socket.io
    ============================================================ */
-function renderHome() {
-  const s = state.get();
-  return `
-    <div class="home-view">
-      <div class="home-hero">🎮 Parole Mutanti</div>
-      <p class="home-tagline">Gioco multiplayer realtime di modifica parole italiane. Vinci l'ultimo che resta in gioco.</p>
-      <div class="home-actions">
-        <button class="btn btn-primary btn-block" disabled>📝 Crea partita (M4.3)</button>
-        <div class="home-divider">oppure</div>
-        <button class="btn btn-secondary btn-block" disabled>🔑 Unisciti con codice (M4.3)</button>
-        <button class="btn btn-ghost btn-block" disabled>📋 Lista partite aperte (M4.3)</button>
-      </div>
-      <p class="text-muted text-small">
-        M4.2 — State + Socket.io client. Stato:
-        <span class="badge ${s.connessione === 'online' ? 'badge-success' : s.connessione === 'connecting' ? 'badge-warn' : 'badge-error'}">${s.connessione}</span>
-        · Tema: <span class="badge badge-muted">${s.tema}</span>
-        · Audio: <span class="badge ${s.audioAbilitato ? 'badge-success' : 'badge-muted'}">${s.audioAbilitato ? 'on' : 'off'}</span>
-      </p>
-      <p class="text-muted text-small">M4.2 — State + Socket client + theme/audio toggle. Prossimo step: views.</p>
-    </div>
-  `;
-}
+socketOn('lobby_updated', (data) => {
+  console.log('[main] lobby_updated', data);
+  // Ricarica partita nello state, mantieni gameId
+  const currentGameId = state.get().gameId;
+  if (data.gameId === currentGameId) {
+    state.update({ partita: { ...state.get().partita, ...data } });
+    // Se siamo già sulla lobby, forza re-render
+    if (location.hash.startsWith('#lobby')) navigate('#lobby');
+  }
+});
+
+socketOn('partita_avviata', (data) => {
+  console.log('[main] partita_avviata', data);
+  // Aggiungi flag running alla partita
+  state.update({ partita: { ...data, state: 'running' } });
+  alert(`🎉 Partita avviata!\n\nParola iniziale: ${data.parolaIniziale}\nTocca a: ${data.giocatoreCorrente}`);
+  // In M5: navigate('#game'). Per ora resta in lobby (M4.3 finisce qui)
+});
+
+socketOn('game_over', (data) => {
+  console.log('[main] game_over', data);
+  alert(`🏆 Vince: ${data.vincitore}!\n\nDurata: ${(data.durataMs / 1000).toFixed(1)}s\nTurni totali: ${data.history.length}`);
+  state.update({ partita: { ...data, state: 'finished' } });
+});
 
 /* ============================================================
    Bootstrap
    ============================================================ */
 (async () => {
-  // Health check iniziale
+  // Health check
   const health = await healthCheck();
   console.log('[main] health:', health.ok ? 'OK' : 'KO', health.db || '');
-  if (!health.ok) {
-    console.warn('[main] Backend non raggiungibile');
-  }
 
   // Connetti socket
   socketConnect();
 
-  // Eventi di stato globale
-  socketOn('partita_avviata', (data) => {
-    console.log('[main] partita avviata', data);
-    state.update({ partita: { ...data, type: 'running' } });
-  });
-  socketOn('game_over', (data) => {
-    console.log('[main] game over', data);
-    state.update({ partita: { ...data, type: 'finished' } });
-  });
-  socketOn('lobby_updated', (data) => {
-    console.log('[main] lobby updated', data);
-    state.update({ partita: { ...data } });
-  });
-
-  // Re-render iniziale
-  render();
+  // Avvia router
+  routerStart();
 })();
