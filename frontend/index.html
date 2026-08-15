@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0f3460">
   <meta name="description" content="Parole Mutanti — gioco multiplayer realtime">
   <title>Parole Mutanti</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎮%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/views.css">
@@ -27,7 +28,8 @@
     <div class="loading">Caricamento…</div>
   </main>
 
-  <!-- Socket.io client (via npm, importato in main.js) -->
+  <!-- Socket.io client via CDN (per compatibilità moduli ES6) -->
+  <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
