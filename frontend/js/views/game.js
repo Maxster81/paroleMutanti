@@ -4,6 +4,10 @@
  * Mostra: timer circle, parola corrente, input submit, history turni recenti.
  * Listener Socket: turn_update, tick, beep, mossa_rifiutata, game_over.
  *
+ * **M5-bugfix**: mostra `currentWord` (l'ultima parola valida) invece di
+ * `parolaIniziale` (la prima parola della partita), così il giocatore
+ * di turno vede da quale parola partire.
+ *
  * @module frontend/js/views/game
  */
 
@@ -27,17 +31,16 @@ export function renderGame(params = {}) {
     `;
   }
 
-  const turno = partita.currentWord ? partita : partita;
+  // M5-bugfix: currentWord è l'ultima parola valida, NON la iniziale
+  // La parola iniziale rimane in partita.parolaIniziale per la lobby
   const word = partita.currentWord || partita.parolaIniziale || '?';
   const giocatore = partita.giocatore || partita.giocatoreCorrente || '?';
   const timeLeft = partita.timeLeft ?? 30;
-  const history = (partita.history || []).slice(-5); // ultimi 5
+  const history = (partita.history || []).slice(-5);
 
-  // Classi per il timer
   const timerClass = timeLeft <= 5 ? 'timer-circle-danger' :
                      timeLeft <= 10 ? 'timer-circle-warning' : '';
 
-  // Siamo il giocatore corrente?
   const mioNome = localStorage.getItem('pm-nome') || '';
   const ioSonoTurnista = giocatore === mioNome;
 
@@ -49,7 +52,7 @@ export function renderGame(params = {}) {
       <p class="text-small text-dim">secondi</p>
 
       <div class="card" style="margin-top: var(--spacing-lg); text-align: left;">
-        <div class="text-small text-dim">Parola corrente</div>
+        <div class="text-small text-dim">Parola corrente (l'ultima valida)</div>
         <div style="font-size: 2rem; font-weight: 700; color: var(--primary); margin: var(--spacing-sm) 0;">
           ${escapeHtml(word)}
         </div>
@@ -92,12 +95,10 @@ export function renderGame(params = {}) {
 }
 
 export function attachGameHandlers() {
-  // Bottone indietro
   document.getElementById('btn-back-lobby')?.addEventListener('click', () => {
     navigate('#lobby');
   });
 
-  // Submit parola
   const form = document.getElementById('submit-form');
   const errorBox = document.getElementById('submit-error');
   const submitBtn = document.getElementById('btn-submit-word');
@@ -138,11 +139,9 @@ export function attachGameHandlers() {
         }
         if (resp.valida) {
           success();
-          // La UI si aggiornerà tramite l'evento turn_update
           document.getElementById('input-parola').value = '';
           lastBeepSecond = -1;
         } else {
-          // Mossa rifiutata ma con ack (motivo nel messaggio)
           if (errorBox) {
             errorBox.textContent = resp.messaggio || 'Mossa rifiutata';
             errorBox.style.display = 'block';
@@ -153,7 +152,6 @@ export function attachGameHandlers() {
     });
   }
 
-  // Passa turno
   document.getElementById('btn-pass')?.addEventListener('click', () => {
     audioClick();
     const partita = state.get().partita;
@@ -163,7 +161,6 @@ export function attachGameHandlers() {
     });
   });
 
-  // Esci (abbandona)
   document.getElementById('btn-leave-game')?.addEventListener('click', () => {
     if (confirm('Vuoi abbandonare la partita?')) {
       const partita = state.get().partita;

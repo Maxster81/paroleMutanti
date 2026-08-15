@@ -3,10 +3,13 @@
  *
  * Bootstrap: state, socket, audio, router, view rendering.
  * Re-render reattivo su cambi di state E di route.
+ *
+ * **M5-bugfix**: al boot, se c'è un gameId in localStorage, tenta di
+ * ripristinare la partita (chiama request_state al server).
  */
 
 import { state } from './state.js';
-import { connect as socketConnect, on as socketOn } from './socket.js';
+import { connect as socketConnect, on as socketOn, emit } from './socket.js';
 import { click as audioClick, beep, tick as audioTick } from './audio.js';
 import { healthCheck } from './api.js';
 import { route, start as routerStart, onRouteChange, navigate } from './router.js';
@@ -113,22 +116,17 @@ socketOn('lobby_updated', (data) => {
 socketOn('partita_avviata', (data) => {
   console.log('[main] partita_avviata', data);
   state.update({ partita: { ...data, state: 'running' } });
-  // Naviga alla game view
   navigate(`#game?gameId=${data.gameId}`);
 });
 
 socketOn('turn_update', (data) => {
-  console.log('[main] turn_update', data);
   if (data.gameId === state.get().gameId) {
-    // Update parita con nuovi dati turno
     state.update({ partita: { ...state.get().partita, ...data } });
-    // Re-render se siamo sulla game view
     if (location.hash.startsWith('#game')) navigate('#game');
   }
 });
 
 socketOn('tick', (data) => {
-  // Aggiorna solo il numero del timer senza re-render completo
   const timerText = document.getElementById('timer-text');
   const timerCircle = document.getElementById('timer-circle');
   if (timerText && data.gameId === state.get().gameId) {
@@ -138,7 +136,6 @@ socketOn('tick', (data) => {
       if (data.timeLeft <= 5) timerCircle.classList.add('timer-circle-danger');
       else if (data.timeLeft <= 10) timerCircle.classList.add('timer-circle-warning');
     }
-    // Beep solo al cambio di secondo, max una volta al secondo
     if (data.timeLeft !== currentTickSecond && data.timeLeft > 0 && data.timeLeft <= 10) {
       audioTick();
       currentTickSecond = data.timeLeft;
@@ -147,13 +144,10 @@ socketOn('tick', (data) => {
 });
 
 socketOn('beep', () => {
-  // Suono addizionale di countdown (ridondante con tick, ok)
   audioTick();
 });
 
 socketOn('mossa_rifiutata', (data) => {
-  console.log('[main] mossa rifiutata', data);
-  // Mostra alert temporaneo
   const errorBox = document.getElementById('submit-error');
   if (errorBox) {
     errorBox.textContent = data.messaggio || 'Mossa rifiutata';
@@ -163,7 +157,6 @@ socketOn('mossa_rifiutata', (data) => {
 });
 
 socketOn('giocatore_eliminato', (data) => {
-  console.log('[main] giocatore_eliminato', data);
   if (data.gameId === state.get().gameId) {
     state.update({ partita: { ...state.get().partita, giocatori: data.giocatoriRimanenti } });
     if (location.hash.startsWith('#game')) navigate('#game');
@@ -171,9 +164,10 @@ socketOn('giocatore_eliminato', (data) => {
 });
 
 socketOn('game_over', (data) => {
-  console.log('[main] game_over', data);
   state.update({ partita: { ...data, state: 'finished' } });
   alert(`🏆 Vince: ${data.vincitore}!\n\nDurata: ${(data.durataMs / 1000).toFixed(1)}s\nTurni totali: ${data.history.length}`);
+  // Pulisci localStorage (partita finita, non rientrare)
+  state.update({ gameId: null, partita: null });
   navigate('#home');
 });
 
@@ -184,11 +178,62 @@ socketOn('partita_cancellata', () => {
 });
 
 /* ============================================================
+   Ripristino partita al boot (M5-bugfix)
+   ============================================================ */
+async function tentaRipristinoPartita() {
+  const gameIdSalvato = localStorage.getItem('pm-gameId');
+  if (!gameIdSalvato) return false; // niente da ripristinare
+
+  const nomeSalvato = localStorage.getItem('pm-nome') || '';
+  console.log('[main] tentativo ripristino partita:', gameIdSalvato);
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      console.warn('[main] timeout ripristino partita');
+      resolve(false);
+    }, 5000);
+
+    emit('request_state', { gameId: gameIdSalvato, nome: nomeSalvato }, (resp) => {
+      clearTimeout(timeout);
+      if (!resp || !resp.ok || !resp.stato) {
+        console.log('[main] partita non recuperabile:', resp?.errore || 'risposta vuota');
+        // Pulisci localStorage
+        localStorage.removeItem('pm-gameId');
+        state.update({ gameId: null, partita: null });
+        resolve(false);
+        return;
+      }
+      // Partita recuperata
+      console.log('[main] partita recuperata:', resp);
+      state.update({ gameId: gameIdSalvato, partita: resp });
+      // Naviga alla view giusta
+      if (resp.state === 'running') {
+        navigate(`#game?gameId=${gameIdSalvato}`);
+      } else {
+        navigate(`#lobby?gameId=${gameIdSalvato}`);
+      }
+      resolve(true);
+    });
+  });
+}
+
+/* ============================================================
    Bootstrap
    ============================================================ */
 (async () => {
   const health = await healthCheck();
   console.log('[main] health:', health.ok ? 'OK' : 'KO', health.db || '');
+
   socketConnect();
-  routerStart();
+
+  // Aspetta un attimo per la connessione socket prima di chiedere request_state
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Prova a ripristinare una partita precedente (se in localStorage)
+  const ripristinata = await tentaRipristinoPartita();
+  if (!ripristinata) {
+    // Nessuna partita precedente, avvia router normalmente
+    routerStart();
+  }
+  // Se ripristinata, il router è già stato avviato implicitamente dal navigate
 })();
