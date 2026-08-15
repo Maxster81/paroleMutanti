@@ -18,20 +18,7 @@
 import { EventEmitter } from 'node:events';
 import { logger } from '../logger.js';
 
-/**
- * Costrutture del TurnManager.
- *
- * @typedef {object} TurnManagerOptions
- * @property {string[]} giocatori - lista nomi giocatori in ordine
- * @property {number} secondiPerTurno - durata di ogni turno (es. 30)
- * @property {string} parolaIniziale - parola di partenza
- * @property {function} onTimeout - callback (giocatoreIndex) chiamato a timeout
- */
-
 export class TurnManager extends EventEmitter {
-  /**
-   * @param {TurnManagerOptions} opzioni
-   */
   constructor(opzioni) {
     super();
     this.giocatori = opzioni.giocatori ?? [];
@@ -49,9 +36,6 @@ export class TurnManager extends EventEmitter {
     this.inPausa = false;
   }
 
-  /**
-   * Avvia il primo turno e il timer.
-   */
   start() {
     if (this.attivo) return;
     this.attivo = true;
@@ -69,9 +53,6 @@ export class TurnManager extends EventEmitter {
     logger.info('turno_avviato', { turno: this.turno, giocatore: this.giocatoreCorrente() });
   }
 
-  /**
-   * Mette in pausa il timer (per operazioni lunghe come validazione AI).
-   */
   pause() {
     if (!this.attivo || this.inPausa) return;
     this.inPausa = true;
@@ -80,9 +61,6 @@ export class TurnManager extends EventEmitter {
     logger.debug('turno_in_pausa', { timeLeft: this.timeLeft });
   }
 
-  /**
-   * Riprende il timer dopo una pausa.
-   */
   resume() {
     if (!this.attivo || !this.inPausa) return;
     this.inPausa = false;
@@ -91,15 +69,11 @@ export class TurnManager extends EventEmitter {
     logger.debug('turno_ripreso', { timeLeft: this.timeLeft });
   }
 
-  /**
-   * Registra una mossa valida e passa al turno successivo.
-   */
   submitMossa(parola, giocatore) {
     if (!this.attivo) {
       logger.warn('submit_ignorato_turno_non_attivo', { parola });
       return;
     }
-
     this.history.push({
       parola,
       giocatore,
@@ -110,9 +84,6 @@ export class TurnManager extends EventEmitter {
     this._prossimoTurno();
   }
 
-  /**
-   * Il giocatore corrente passa il turno volontariamente.
-   */
   passaTurno(giocatore) {
     if (!this.attivo) return;
     if (this.inPausa) {
@@ -129,9 +100,6 @@ export class TurnManager extends EventEmitter {
     this._onTickTimeout();
   }
 
-  /**
-   * Ferma il timer e l'attività.
-   */
   stop() {
     this.attivo = false;
     this._fermaTimer();
@@ -139,6 +107,8 @@ export class TurnManager extends EventEmitter {
 
   /**
    * Ritorna lo stato corrente (per broadcast via socket).
+   * Include sia `parolaCorrente` (nome interno) che `currentWord` (alias
+   * per compatibilità frontend).
    */
   statoCorrente() {
     return {
@@ -146,6 +116,7 @@ export class TurnManager extends EventEmitter {
       giocatore: this.giocatoreCorrente(),
       giocatoreIndex: this.currentPlayerIndex,
       parolaCorrente: this.currentWord,
+      currentWord: this.currentWord,
       timeLeft: Math.max(0, this.timeLeft),
       timeLimit: this.secondiPerTurno,
       inPausa: this.inPausa,
@@ -153,25 +124,14 @@ export class TurnManager extends EventEmitter {
     };
   }
 
-  /**
-   * Ritorna il nome del giocatore di turno corrente.
-   */
   giocatoreCorrente() {
     return this.giocatori[this.currentPlayerIndex] ?? null;
   }
 
-  /**
-   * Ritorna l'indice del prossimo giocatore (ciclando).
-   * @private
-   */
   _prossimoIndice() {
     return (this.currentPlayerIndex + 1) % this.giocatori.length;
   }
 
-  /**
-   * Passa al turno successivo.
-   * @private
-   */
   _prossimoTurno() {
     this.currentPlayerIndex = this._prossimoIndice();
     this.turno += 1;
@@ -184,44 +144,27 @@ export class TurnManager extends EventEmitter {
     });
   }
 
-  /**
-   * Avvia (o riavvia) il timer.
-   * @private
-   */
   _avviaTimer() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => this._tick(), 1000);
   }
 
-  /**
-   * Tick del timer (chiamato ogni secondo).
-   * @private
-   */
   _tick() {
     if (!this.attivo) {
       this._fermaTimer();
       return;
     }
-    if (this.inPausa) {
-      // Non decrementare se in pausa
-      return;
-    }
+    if (this.inPausa) return;
     this.timeLeft -= 1;
     this.emit('tick', { timeLeft: this.timeLeft, turno: this.turno });
-
     if (this.timeLeft <= 10 && this.timeLeft > 0) {
       this.emit('beep', { timeLeft: this.timeLeft });
     }
-
     if (this.timeLeft <= 0) {
       this._onTickTimeout();
     }
   }
 
-  /**
-   * Gestione timeout timer scaduto.
-   * @private
-   */
   _onTickTimeout() {
     if (!this.attivo) return;
     logger.info('turno_scaduto', { giocatore: this.giocatoreCorrente() });
@@ -229,10 +172,6 @@ export class TurnManager extends EventEmitter {
     this.onTimeout(this.currentPlayerIndex);
   }
 
-  /**
-   * Ferma solo il timer interval (mantiene stato).
-   * @private
-   */
   _fermaTimer() {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
