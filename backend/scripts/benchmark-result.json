@@ -1,0 +1,21 @@
+{
+  "n_richieste": 15,
+  "n_successi": 15,
+  "n_errori": 0,
+  "errori_dettaglio": {},
+  "durata_totale_ms": 13504,
+  "parola_test": "smartphone",
+  "timeout_ms": 10000,
+  "timestamp": "2026-08-15T16:14:20.342Z",
+  "latenze": {
+    "min_ms": 274,
+    "max_ms": 980,
+    "media_ms": 343,
+    "mediana_ms": 294,
+    "p95_ms": 980,
+    "p99_ms": 980
+  },
+  "risultati_validita": {
+    "YES": 15
+  }
+}
