@@ -1,97 +1,129 @@
 # Active Context — Focus Corrente
 
 ## 🎯 Focus Corrente
-**Milestone 2: Backend Core** — 🔄 **IN CORSO** (2026-08-15). M1 chiusa, 6 MCP configurati.
+**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato (game view rifinita, nuova end view, home con lista partite auto-aggiornate). Bug fix backend M5 conclusi (refresh, submit turnista, abbandono multi-giocatore). Prossimo lavoro: test flusso 4 giocatori + refinements audio + **M6 Deploy**.
 
-## ✅ Cosa è stato fatto (oggi)
-- M1 ✅ Setup & DB completato (539.780 parole, performance OK)
-- 6 MCP server configurati in `cline_mcp_settings.json`:
-  - `filesystem` (limitato a C:\Users\death\paroleMutanti + www + efftrack-dev)
-  - `memory` (knowledge graph)
-  - `playwright` (test e2e browser)
-  - `context7` (docs aggiornate)
-  - `postgres` (connesso a parole_mutanti)
-  - `fetch` (chiamate HTTP)
+## ✅ Cosa è stato fatto (riepilogo cronologico)
 
-## 🎯 Risultati M1 (per memoria)
-- ✅ **539.780 parole italiane** caricate (filtro 3-10 lettere)
-- ✅ Performance query random: **45.84ms** (target < 50ms)
-- ✅ Tempo import: **14.7s**
-- ✅ 3 tabelle + 1 vista + 4 script Node + 9 .clinerules + 6 MCP
+### M1 — Setup & DB ✅
+- 539.780 parole italiane caricate (filtro 3-10 lettere), performance query 45.84ms
+- 3 tabelle + 1 vista + 4 script Node + 9 .clinerules + 6 MCP configurati
 
-## 🔄 Milestone 2: Backend Core (IN CORSO)
+### M2 — Backend Core ✅
+- Server Express + Socket.io + health check `/health`
+- GameManager (state RAM), TurnManager (timer ottimistico/lockless), Validator (3-step)
+- Lobby events: createGame, joinGame, ready
+- 28/28 test unit pass, smoke test E2E ok
 
-### Obiettivi
-- Server Express + Socket.io funzionante
-- Health check endpoint (`/health`)
-- GameManager: gestione stato partite in RAM
-- Validator: validazione ibrida (DB + Levenshtein distanza 1)
-- TurnManager: gestione turni e timer (lockless, ottimistica)
-- Lobby events: createGame, joinGame
-- Test unit Validator
+### M3 — AI Integration ✅
+- Benchmark DeepSeek: 343ms media, timeout 1500ms
+- Modulo AI completo: client + cache + rateLimiter
+- Validator esteso a 4-step con fallback AI
+- Test E2E reale con parola inesistente → AI → risposta
 
-### Step 1 — Utility (logger, rateLimiter, normalizza, levenshtein) + test
-- `backend/src/logger.js` — logger strutturato JSON
-- `backend/src/utils/levenshtein.js` — wrapper package `levenshtein`
-- `backend/src/utils/normalizza.js` — lowercase, trim, validateCharset
-- `backend/src/utils/rateLimiter.js` — sliding window per socket (5/sec default)
-- `backend/tests/levenshtein.test.js`
-- `backend/tests/normalizza.test.js`
+### M4b — Dizionario Ibrido ✅ (in sostituzione del DDL M4 "plain")
+- **Push**: dizionario napolux sostituito con **LO (LibreOffice) + HF (HuggingFace)**
+- 184.393 parole totali (poi 185.723 dopo fix lettere straniere)
+- Script import/update/check +ETag e ON CONFLICT
+- Schema source enum: `('LO', 'HF', 'DB', 'AI')`
 
-### Step 2 — DB queries
-- `backend/src/db/wordQueries.js` — `parolaEsistente(word)`, `paroleCasuali(length, n)`
+### M4b-fix — Lettere Straniere ✅
+- Charset esteso a `a-zàèéìòùjkwxy`
+- +1.330 nuove parole (j/k/w/x/y: wifi, weekend, jazz, kiwi, yogurt...)
+- Totale dizionario: **185.723 parole**
 
-### Step 3 — Game Logic
-- `backend/src/game/WordPicker.js` — sceglie parola iniziale random 5-8 lettere
-- `backend/src/game/Validator.js` — validazione ibrida
-- `backend/src/game/TurnManager.js` — timer, tick, timeout, cambio turno
-- `backend/src/game/GameManager.js` — state RAM partite, CRUD
+### M4 — Frontend Base (in parte, fino a M4.4) ✅
+- `frontend/index.html` shell con view switching
+- `css/base.css`, `components.css`, `views.css`
+- `js/main.js`, `router.js`, `state.js`, `api.js`, `socket.js`
+- `js/views/home.js`, `create.js`, `join.js`, `lobby.js`, `game.js`
+- `js/audio.js` (Web Audio API)
+- (end.js creata in M5, vedi sotto)
 
-### Step 4 — Socket handlers
-- `backend/src/sockets/lobbyHandler.js` — createGame, joinGame, ready
-- `backend/src/sockets/gameHandler.js` — submitWord, passTurn
-- `backend/src/sockets/index.js` — attachSocketHandlers(io)
+### M5-bugfix — Refresh in partita + parola corrente ✅
+- Persistenza `pm-gameId` + `pm-nome` in localStorage
+- `tentaRipristinoPartita()` al boot con overlay + timeout 5s
+- Parola al centro = ultima valida (`currentWord`)
 
-### Step 5 — Server + smoke test
-- `backend/src/server.js` — Express + Socket.io attached + static frontend
-- Smoke test con `wscat` o `node -e "..."` per verificare health + connessione
+### M5-bugfix2 — Sweeper + Ripristino Robusto ✅
+- Sweeper ogni 60s: waiting >5min, running 0 socket >2min, finished >1min
+- `partitaPerLobby(p)` helper con payload completo
+- Overlay ripristino + attesa connessione socket (max 3s) + alert chiari
 
-### Step 6 — Aggiornamento memory bank
-- `M2-backend-core.md` con risultati e decisioni
+### Fix lobby "partita senza codice" — commit `6a9b3a3` ✅
+- **Bug**: `partitaPerLobby(p)` ritornava `gameId: p.id` ma NON `id: p.id`. `views/lobby.js` usa `partita.id || ''` → code-display vuoto.
+- **Fix**: aggiunto `id: p.id` accanto a `gameId: p.id` (retrocompatibilità mantenuta).
+
+### Contatore TURNO visibile sopra il timer (✅ verificato)
+- **Nuova feature frontend (sola UI)**: aggiunto in `frontend/js/views/game.js` (righe ~51-52) un div `#turno-counter` sopra il timer circolare che mostra `TURNO n · Round m/x`.
+- Proprietà usate con fallback sicuri: `partita.turno ?? 1`, `partita.round ?? 1`, `partita.roundsTotali ?? (partita.giocatori?.length ?? 1)`.
+- **Verifica Playwright su partita reale (2 giocatori) PASS**: all'avvio mostra `TURNO 1 · Round 1/2`; dopo "Passa il turno" si aggiorna a `TURNO 1 · Round 2/2` (turnista passato da Mario a Luigi). Console pulita (0 errori, 0 warning). Screenshot: `contatore-turno.png`.
+- **Nota test (importante)**: per marcare un giocatore pronto l'evento socket corretto è **`set_ready`** con `{ nome, ready: true }` (NON `toggle_ready`). Script riutilizzabile: `/tmp/luigi-join.mjs` (simula secondo giocatore join + set_ready, resta in ascolto per `partita_avviata`).
+- Lo script usa `set_ready` e attende `partita_avviata` (usa l'evento corretto emesso da `lobbyHandler`).
+
+### Fix refresh completo (M5) ✅
+- **Bug 1**: dopo il refresh, `request_state` non ri-registrava il socket → il client non riceveva più tick/turn_update.
+- **Fix 1**: `request_state` ora chiama `registraSocketInPartita(socket, gameId, partita)` (nuovo helper in `lobbyHandler.js`).
+- **Bug 2**: `request_state` non includeva `id`/`gameId` → il giocatore di turno dopo il refresh inviava `submit_word` con `gameId: undefined` → errore generico.
+- **Fix 2**: lo stato restituito include `id: partita.id` e `gameId: partita.id`.
+- **Bug 3**: abbandonando 1 giocatore su 2 durante la partita, l'altro restava in gara fino allo scadere (niente vincitore).
+- **Fix 3**: nuovo `GameManager.abbandonaGiocatore()` + `_eliminaGiocatore()` centralizzato; `leave_game` ora gestisce anche lo stato `running`. Test E2E passato: Alice vince dopo abbandono di Bob.
+- **Decisione**: la disconnessione socket NON è trattata come abbandono durante running (altrimenti un refresh farebbe vincere l'avversario); le disconnessioni involontarie restano gestite dal sweeper.
+
+### Modello round/turno/limbo (M5b) ✅
+- **Bug**: in una partita a 3, due giocatori non rispondevano e il terzo vinceva senza giocare.
+- **Modello implementato**: `TurnManager` con round sequenziali ed **evoluzione a catena** della parola.
+  - Ogni round: il giocatore corrente ha TOT secondi per rispondere con parola a distanza 1.
+  - Stato per round: `passato` (ha risposto valido) o `limbo` (timeout).
+  - Fine turno:
+    - Tutti `limbo` → **pareggio**: nuova parola base, tutti restano in gioco.
+    - ≥1 `passato` → `limbo` eliminati; `passati` vanno avanti con l'ultima parola valida.
+    - Dopo elim, se resta 1 solo → **vince**.
+  - **Abbandono**: 2 giocatori → l'altro vince subito; ≥3 → si prosegue, valutazione a fine turno.
+- **Test E2E**: 3 turni tutti in limbo → pareggio + nuova parola (PASS).
+- **Eventi socket**: `round_passato`, `round_limbo`, `round_start`, `pareggio`, `turno_finito`.
+
+### M5 — Frontend: Game view rifinita + End view + Home lista (✅)
+- **Home**: lista partite visibile di default (rimosso il pulsante), **polling 5s** tramite `list_games`, auto-fermo quando si lascia la home.
+- **game.js**: lista giocatori rimasti + feedback "Verifica in corso…" (consuma `turn_paused`/`turn_resumed`, disabilita submit).
+- **end.js** (nuova): vincitore, durata, turni, verifiche AI, pulsanti "Nuova partita"/"Home", jingle vittoria.
+- **main.js**: `game_over` → `#end` (niente alert), route `#end` registrata.
+- **CSS**: stili end-view + home-list + aggiunto `.btn-success` (era usato in lobby ma non definito).
+- Test: home con polling funzionante (partita visibile, "aggiornato HH:MM:SS"), nessun errore console.
+- Nota test: UI multi-tab a 2 giocatori limitata dal localStorage condiviso tra tab (non è un bug dell'app).
 
 ## 📍 Decisioni attive
-- **Porta dev WSL**: 8090 (no Caddy, accesso diretto) ← confermato utente
+- **Porta dev WSL**: 8090 (no Caddy, accesso diretto) ← confermato utente; in produzione bind `127.0.0.1` + Caddy
 - **Caddy prod**: blocco separato per `parolemutanti.maxster.top` ← predisposto in `deploy/`
-- **Range parole iniziali**: **5-8 lettere** ← confermato utente
+- **Range parole iniziali**: 5-8 lettere ← confermato utente
 - **Audio**: Web Audio API (no file .mp3) ← confermato utente
 - **Versioning SemVer**: attivazione post-M5 ← confermato utente
 - **Default games_to_win**: 2 (configurabile 1-4) ← confermato utente
 - **Logica turni/timer**: ottimistica (lockless) ← confermato utente
+- **Dizionario**: LO + HF (ridondanza, no napolux) ← confermato utente
+- **Charset**: accettate j/k/w/x/y (prestiti consolidati) ← confermato utente
 
 ## 🛠️ MCP Attivi nel Progetto (6 totali)
-- ✅ **filesystem** (limitato a `C:\Users\death\paroleMutanti` + `www` + `efftrack-dev`)
+- ✅ **filesystem** (config aggiornata per includere `/home/death/paroleMutanti` — **serve riavvio di Cline** perché diventi effettivo)
 - ✅ **memory** (knowledge graph, complementare al memory-bank file)
-- ✅ **playwright** (test e2e browser, da usare in M4+)
-- ✅ **context7** (docs aggiornate librerie, da usare in M2+)
+- ✅ **playwright** (test e2e browser con Chromium headless)
+- ✅ **context7** (docs aggiornate librerie)
 - ✅ **postgres** (query DB dirette connesso a `parole_mutanti`)
-- ✅ **fetch** (chiamate HTTP esterne, utile per DeepSeek API in M3)
+- ✅ **fetch** (chiamate HTTP esterne)
 
-## ⚠️ Rischi aperti per M2
-1. **Performance Levenshtein in game loop**: per partite con ~30 turni, calcolare distanza edit su 540k parole potrebbe essere lento. Strategia: query DB con `WHERE length = newWordLength ± 1` poi Levenshtein solo su quel subset (~50k parole max).
-2. **Gestione concorrenza GameManager**: più partite attive in RAM richiedono lock o strutture dati thread-safe. Node single-thread aiuta ma serve async discipline. **Approccio scelto: ottimistico** (lockless, ultima submit vince).
-3. **Rate limit submit**: 5/sec per socket — implementato custom in `utils/rateLimiter.js`.
+## ⚠️ Rischi aperti / da verificare
+1. **Allineamento MCP filesystem**: config già aggiornata (file Linux `/home/death/.vscode-server/data/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`) per includere `/home/death/paroleMutanti`. **Serve riavviare Cline** (o "Retry" sul banner) perché il server MCP ricarichi la nuova lista di percorsi.
+2. **Performance Levenshtein in game loop**: mitigata con query `WHERE length = newWordLength ± 1` poi Levenshtein sul subset.
+3. **Gestione concorrenza GameManager**: approccio ottimistico (lockless, ultima submit vince).
+4. **Rate limit submit**: 5/sec per socket — implementato custom in `utils/rateLimiter.js`.
 
 ## 📚 Learnings
-- L'ambiente ha già 4 web services Python (uvicorn) attivi, niente deve essere toccato
-- WSL2 Ubuntu 24.04.4 con systemd attivo (Postgres si installa come servizio classico)
-- Caddy 2.11.4 in ascolto su :8080 (HTTP) — il nostro servizio sarà separato
-- L'utente preferisce workflow "io lancio i comandi sudo, tu prepari il codice"
-- Le regole di efftrack sono state adattate: 9 file invece di 11, focalizzate su Node/Vanilla invece che Python/Jinja2
+- Ambiente con 4 web services Python (uvicorn) attivi: non toccare
+- WSL2 Ubuntu 24.04.4 con systemd attivo (Postgres come servizio classico)
+- L'utente preferisce "io lancio i comandi sudo, tu prepari il codice"
 - `yauzl` gestisce ZIP senza dipendenze di sistema
-- `pg` client non supporta `COPY` con stringa → INSERT batch è la strada
-- Il dizionario `parole_uniche.txt` di napolux ha 986k righe, ne usiamo 540k (53%) dopo filtro 3-10 lettere e dedup
-- WSL2 ha `unzip` non installato di default
-- `\echo` psql non funziona con `pg` client
-- **Cline MCP config vive in Windows** (`%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`), raggiungibile da WSL via `/mnt/c/Users/death/AppData/Roaming/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
-- **Dopo modifica config MCP, serve riavviare Cline** (o cliccare "Retry" sul banner di errore se i server non partono)
-- **6 MCP ora configurati**: aggiunti filesystem/memory/playwright/context7 in aggiunta a postgres/fetch
+- `pg` client non supporta `COPY` con stringa → INSERT batch
+- Cline MCP config vive in Windows, raggiungibile da WSL via `/mnt/c/Users/death/AppData/Roaming/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+- **Dopo modifica config MCP, serve riavviare Cline** (o "Retry" sul banner di errore)
+- Il backend si avvia con `npm start` (no watch) o `npm run dev` (watch); nessun processo attivo prima del riavvio manuale
+- Health check su `http://localhost:8090/health`
