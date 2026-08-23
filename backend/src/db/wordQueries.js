@@ -52,6 +52,22 @@ export async function parolaEsistenteConSource(parola) {
 }
 
 /**
+ * Verifica quali tra un elenco di parole esistono nel dizionario.
+ * Ritorna un Set con le parole trovate (utile per il fallback morfologico).
+ *
+ * @param {string[]} parole - parole normalizzate (lowercase)
+ * @returns {Promise<Set<string>>}
+ */
+export async function paroleEsistenti(parole) {
+  if (!Array.isArray(parole) || parole.length === 0) return new Set();
+  const result = await query(
+    'SELECT word FROM words WHERE word = ANY($1)',
+    [parole]
+  );
+  return new Set(result.rows.map((r) => r.word));
+}
+
+/**
  * Inserisce una parola validata dall'AI nel dizionario (source='AI').
  * Usa ON CONFLICT DO NOTHING per evitare race condition con altri worker.
  *

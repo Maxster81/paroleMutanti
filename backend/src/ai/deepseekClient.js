@@ -32,7 +32,7 @@ function buildPrompt(parola) {
     },
     {
       role: 'user',
-      content: `La parola "${parola}" è una parola italiana di senso compiuto? Rispondi solo YES o NO.`,
+      content: `La parola "${parola}" esiste nella lingua italiana (come lemma o come forma flessa corretta)? Rispondi solo YES o NO.`,
     },
   ];
 }
@@ -74,12 +74,16 @@ async function chiamaDeepSeek(parola) {
     }
 
     const data = await response.json();
-    const testoRisposta = (data.choices?.[0]?.message?.content ?? '').trim().toUpperCase();
+    const testoRisposta = (data.choices?.[0]?.message?.content ?? '').trim();
 
-    // Normalizza: accettiamo risposte tipo "YES.", "YES\n", ecc.
-    const valida = /^YES\b/.test(testoRisposta);
+    // Normalizza: accettiamo risposte univoche YES / SÌ / SI (inglese o
+    // italiano, con eventuale punteggiatura "SÌ.", "si", ecc.). La lingua non
+    // importa purché il significato sia inequivocabile.
+    const valida = ['yes', 'sì', 'si'].includes(
+      testoRisposta.toLowerCase().replace(/[^a-zà-ù]/g, '')
+    );
 
-    return { valida, risposta: testoRisposta, durataMs };
+    return { valida, risposta: testoRisposta.toUpperCase(), durataMs };
   } catch (err) {
     clearTimeout(timer);
     const durataMs = Date.now() - inizio;

@@ -1,19 +1,23 @@
 /**
  * Validator.js — Validazione ibrida delle mosse di gioco
  *
- * Una mossa è valida se:
+ * Una mossa è valida se (controllo a TRE fasi):
  * 1. La parola rispetta il charset e la lunghezza consentita (Validator base)
  * 2. La distanza Levenshtein dalla parola precedente è esattamente 1
- * 3. La parola esiste nel dizionario (query DB)
- * 4. **FALLBACK AI (M3)**: se non esiste nel DB, chiedi a DeepSeek.
- *    Se DeepSeek dice YES → INSERT nel DB (source='AI') e valida.
+ * 3. **Fase 1 — DB**: la parola esiste nel dizionario (query DB)
+ * 4. **Fase 2 — Forme flesse/derivate**: se non nel DB, prova a derivare il
+ *    lemma (femminile/plurale/participio...) e verifica il lemma nel DB
+ *    (source='MORF'). Copre casi come `oziata`/`oziati` → lemma `oziato`.
+ * 5. **Fase 3 — AI (fallback)**: solo se nemmeno il lemma è nel DB, chiedi a
+ *    DeepSeek. Se YES → INSERT nel DB (source='AI') e valida.
  *
  * @module backend/src/game/Validator
  */
 
-import { parolaEsistenteConSource, inserisciParolaAI } from '../db/wordQueries.js';
+import { parolaEsistenteConSource, paroleEsistenti, inserisciParolaAI } from '../db/wordQueries.js';
 import { isDistanzaUno } from '../utils/levenshtein.js';
 import { validaParola, normalizzaBase } from '../utils/normalizza.js';
+import { candidatiFormeBase } from '../utils/morfologia.js';
 import { verificaParolaAI } from '../ai/deepseekClient.js';
 import { get as aiCacheGet, set as aiCacheSet } from '../ai/cache.js';
 import { check as aiRateCheck } from '../ai/rateLimiter.js';
@@ -26,8 +30,9 @@ import { logger } from '../logger.js';
  * @property {boolean} valida
  * @property {string|null} motivo
  * @property {string} normalizzata
- * @property {string|null} source - 'DB' | 'AI' | null
+ * @property {string|null} source - 'DB' | 'MORF' | 'AI' | null
  * @property {string|null} messaggio
+ * @property {string} [lemma] - lemma derivato dalla morfologia (source 'MORF')
  * @property {boolean} [ai_usata]
  * @property {number} [ai_durata_ms]
  */
@@ -84,7 +89,7 @@ export async function validaMossa({ parolaPrecedente, parolaNuova, gameId, parol
     };
   }
 
-  // 3. Check esistenza nel dizionario
+  // 3. Fase 1 — Check esistenza nel dizionario
   const checkDb = await parolaEsistenteConSource(normalizzata);
   if (checkDb.esiste) {
     return {
@@ -96,7 +101,27 @@ export async function validaMossa({ parolaPrecedente, parolaNuova, gameId, parol
     };
   }
 
-  // 4. FALLBACK AI: parola non in DB, provo DeepSeek
+  // 4. Fase 2 — Forme flesse/derivate: la parola non è nel DB ma può essere
+  //    una forma flessa (femminile, plurale, participio...) di un lemma
+  //    presente. Deriviamo i candidati base e li verifichiamo nel DB.
+  const candidati = candidatiFormeBase(normalizzata);
+  if (candidati.length > 0) {
+    const presenti = await paroleEsistenti(candidati);
+    if (presenti.size > 0) {
+      const lemma = candidati.find((c) => presenti.has(c));
+      logger.info('parola_accettata_morfologia', { parola: normalizzata, lemma });
+      return {
+        valida: true,
+        motivo: null,
+        normalizzata,
+        source: 'MORF',
+        lemma,
+        messaggio: null,
+      };
+    }
+  }
+
+  // 5. Fase 3 — FALLBACK AI: parola non in DB (né forme flesse), provo DeepSeek
   // 4a. Controlla cache
   const cached = aiCacheGet(normalizzata);
   if (cached) {
