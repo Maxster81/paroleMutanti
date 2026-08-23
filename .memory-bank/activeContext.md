@@ -1,7 +1,7 @@
 # Active Context — Focus Corrente
 
 ## 🎯 Focus Corrente
-**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (refresh, submit turnista, abbandono multi-giocatore, **desincronizzazione turno/round `3437de2`**, **M5c anti-ripetizione + elenco "Parole già scritte"**). Prossimo lavoro: test flusso 4 giocatori + refinements audio + **M6 Deploy**.
+**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (desincronizzazione `3437de2`, **M5c anti-ripetizione + elenco parole**, **validazione a tre fasi DB+morfologia+AI**). **M6 Deploy in preparazione**: `VERSION` 1.0.0 attivato, `sync-to-prod.sh` + `deploy/deploy.sh` creati, repo pubblico `paroleMutanti_prod` popolato e pushato. Resta: `deploy/backup.sh`, deploy reale su server (Caddy TLS), test flusso 4 giocatori, refinements audio.
 
 ## ✅ Cosa è stato fatto (riepilogo cronologico)
 
@@ -127,6 +127,10 @@
 - **Logica turni/timer**: ottimistica (lockless) ← confermato utente
 - **Dizionario**: LO + HF (ridondanza, no napolux) ← confermato utente
 - **Charset**: accettate j/k/w/x/y (prestiti consolidati) ← confermato utente
+- **SemVer attivato (M6)**: `VERSION` = 1.0.0 in root; `package.json` allineato; bump obbligatorio ad ogni commit funzionale (regola .clinerules/04)
+- **Repo produzione**: `paroleMutanti_prod` (pubblico) affiancato in `../paroleMutanti_prod`; popolato via `sync-to-prod.sh` (whitelist, esclude rules/memory-bank/tests/ref personali); deploy con `deploy/deploy.sh`
+- **Porta prod canonica**: 8090 (Caddy `reverse_proxy 127.0.0.1:8090`); dominio placeholder `__DOMAIN__`
+- **HOST prod**: default `127.0.0.1` quando `NODE_ENV=production` (config.js)
 
 ## 🛠️ MCP Attivi nel Progetto (6 totali)
 - ✅ **filesystem** (config aggiornata per includere `/home/death/paroleMutanti` — **serve riavvio di Cline** perché diventi effettivo)

@@ -110,17 +110,19 @@
 ## ❌ Cosa resta da fare
 
 ### M6 (Deploy)
-- [ ] `deploy/Caddyfile.prod.snippet` (già fatto, validare)
-- [ ] `deploy/parole-mutanti.service` (già fatto, validare)
+- [x] `deploy/deploy.sh` creato (flag-based: `--install/--env/--service/--caddy/--update`, `--domain/--port/--dir/--env-file`)
+- [x] `deploy/Caddyfile.prod.snippet` → template (`__DOMAIN__` / `__PORT__`, no riferimenti personali)
+- [x] `deploy/parole-mutanti.service` pulito (niente `Documentation` personale; note su PORT/HOST)
+- [x] `sync-to-prod.sh` (whitelist rsync dev→prod, marker `.last-sync-dev-commit`, `--dry-run`)
+- [x] `VERSION` = `1.0.0` (SemVer attivato post-M5; `package.json` allineato)
+- [x] Repo pubblico `paroleMutanti_prod` creato, popolato e **pushato** (niente rules/memory-bank/tests/ref personali)
+- [x] `backend/src/config.js`: default `HOST=127.0.0.1` quando `NODE_ENV=production`
 - [ ] Script backup DB (`deploy/backup.sh`)
-- [ ] Bind prod `127.0.0.1` + DNS `parolemutanti.maxster.top`
-- [ ] TLS Let's Encrypt
-- [ ] Test produzione
+- [ ] Deploy reale su server (Caddy TLS, DNS, test produzione)
 
 ### Post-M5 (opzionali / rifiniture)
 - [ ] Test Playwright multi-context per flusso 4 giocatori (per evitare il localStorage condiviso tra tab)
 - [ ] Rifiniture audio se richieste
-- [ ] Attivazione versioning SemVer (post-M5, come da regola .clinerules/04)
 
 ## 📈 Metriche di Avanzamento
 ```
