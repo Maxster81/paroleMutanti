@@ -1,16 +1,18 @@
 # =====================================================================
 # Caddyfile.prod.snippet — Blocco Caddy per produzione Ubuntu
 # =====================================================================
+# TEMPLATE con placeholder. deploy/deploy.sh sostituisce __DOMAIN__ e __PORT__
+# con i valori reali (oppure sostituiscili a mano prima dell'uso).
 # DA COPIARE/INCOLLARE nel /etc/caddy/Caddyfile del server di produzione.
 # NON sostituisce il Caddyfile esistente: aggiunge un NUOVO host block.
 #
-# Hostname previsto: parolemutanti.maxster.top
-# Porta interna:     3000 (dove gira il backend Node)
-# TLS:               Let's Encrypt automatico via Cloudflare o custom cert
+# Hostname previsto: __DOMAIN__
+# Porta interna:     __PORT__ (dove gira il backend Node)
+# TLS:               Let's Encrypt automatico (Cloudflare proxy o cert custom)
 # =====================================================================
 
-# --- Blocco principale: parolemutanti.maxster.top (HTTPS automatico) ---
-parolemutanti.maxster.top {
+# --- Blocco principale: __DOMAIN__ (HTTPS automatico) ---
+__DOMAIN__ {
     # Compressione gzip
     encode gzip zstd
 
@@ -36,7 +38,7 @@ parolemutanti.maxster.top {
 
     # Reverse proxy al backend Node
     # IMPORTANTE: header Connection chiuso e buffering disattivato per WebSocket
-    reverse_proxy 127.0.0.1:3000 {
+    reverse_proxy 127.0.0.1:__PORT__ {
         header_up Host {host}
         header_up X-Real-IP {remote}
         header_up X-Forwarded-For {remote}
@@ -52,18 +54,19 @@ parolemutanti.maxster.top {
 
 # --- (Opzionale) Blocco di fallback HTTP->HTTPS ---
 # Decommentare se vuoi forzare redirect da http a https
-# http://parolemutanti.maxster.top {
-#     redir https://parolemutanti.maxster.top{uri} permanent
+# http://__DOMAIN__ {
+#     redir https://__DOMAIN__{uri} permanent
 # }
 
 # =====================================================================
 # Note di deploy per Ubuntu:
 #
-# 1) Salva questo snippet in /etc/caddy/Caddyfile (o mergialo con il tuo esistente)
-# 2) Crea la cartella log: sudo mkdir -p /var/log/caddy && sudo chown caddy:caddy /var/log/caddy
-# 3) Testa config: sudo caddy validate --config /etc/caddy/Caddyfile
-# 4) Ricarica: sudo systemctl reload caddy
+# 1) Sostituisci __DOMAIN__ e __PORT__ (es. via deploy/deploy.sh)
+# 2) Salva questo snippet in /etc/caddy/Caddyfile (o mergialo con il tuo esistente)
+# 3) Crea la cartella log: sudo mkdir -p /var/log/caddy && sudo chown caddy:caddy /var/log/caddy
+# 4) Testa config: sudo caddy validate --config /etc/caddy/Caddyfile
+# 5) Ricarica: sudo systemctl reload caddy
 #
-# DNS: il dominio parolemutanti.maxster.top deve puntare all'IP del server.
+# DNS: il dominio __DOMAIN__ deve puntare all'IP del server.
 # Se usi Cloudflare, abilita proxy e imposta SSL = Full (strict).
 # =====================================================================

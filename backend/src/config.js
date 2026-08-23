@@ -78,7 +78,9 @@ export const config = (() => {
   const cfg = {
     // Server
     port: toInt(process.env.PORT, 8090, 1, 65535),
-    host: process.env.HOST || '0.0.0.0',
+    // In produzione il default è 127.0.0.1 (dietro reverse proxy Caddy);
+    // in dev resta 0.0.0.0 (accessibile da rete locale/WSL).
+    host: process.env.HOST || (process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0'),
     nodeEnv: process.env.NODE_ENV || 'development',
     publicBasePath: process.env.PUBLIC_BASE_PATH || '',
     logLevel: process.env.LOG_LEVEL || 'info',

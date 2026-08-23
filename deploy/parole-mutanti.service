@@ -11,7 +11,6 @@
 
 [Unit]
 Description=Parole Mutanti — gioco multiplayer realtime
-Documentation=https://github.com/maxster/paroleMutanti
 After=network.target postgresql.service
 Wants=postgresql.service
 
@@ -21,6 +20,8 @@ Type=simple
 User=parole-mutanti
 Group=parole-mutanti
 WorkingDirectory=/opt/paroleMutanti
+# La porta di ascolto è quella in PORT (dall'EnvironmentFile).
+# In produzione impostare HOST=127.0.0.1 (il reverse proxy Caddy sta davanti).
 EnvironmentFile=/etc/parole-mutanti/.env
 ExecStart=/usr/bin/node backend/src/server.js
 Restart=always

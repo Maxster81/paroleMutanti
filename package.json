@@ -1,7 +1,7 @@
 {
   "name": "parole-mutanti",
-  "version": "0.1.0",
-  "description": "Gioco multiplayer realtime di modifica parole italiane (M1+M2+M3+dict)",
+  "version": "1.0.0",
+  "description": "Gioco multiplayer realtime di modifica parole italiane",
   "type": "module",
   "main": "backend/src/server.js",
   "engines": {
@@ -29,7 +29,7 @@
     "socket.io",
     "realtime"
   ],
-  "author": "Maxster",
+  "author": "Parole Mutanti",
   "license": "MIT",
   "dependencies": {
     "dotenv": "^16.4.5",

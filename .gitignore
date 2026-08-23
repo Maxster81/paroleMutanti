@@ -62,3 +62,6 @@ frontend/assets/audio/*.tmp
 
 # File di stato Cline
 .clinerules.local
+
+# Marker locale di sincronizzazione (sync-to-prod.sh, NON committare)
+.last-sync-dev-commit
