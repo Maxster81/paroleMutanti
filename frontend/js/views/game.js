@@ -35,7 +35,8 @@ export function renderGame(params = {}) {
   const word = partita.currentWord || partita.parolaIniziale || '?';
   const giocatore = partita.giocatore || partita.giocatoreCorrente || '?';
   const timeLeft = partita.timeLeft ?? 30;
-  const history = (partita.history || []).slice(-5);
+  // M5c: elenco completo delle parole già usate (catena, in ordine)
+  const paroleScritte = partita.history || [];
 
   const timerClass = timeLeft <= 5 ? 'timer-circle-danger' :
                      timeLeft <= 10 ? 'timer-circle-warning' : '';
@@ -87,23 +88,28 @@ export function renderGame(params = {}) {
         <button class="btn btn-ghost btn-block" id="btn-leave-game">🚪 Esci (abbandona)</button>
       `}
 
+      ${paroleScritte.length > 0 ? `
+        <div class="card" style="margin-top: var(--spacing-md); text-align: left;">
+          <div class="text-small text-dim">📜 Parole già scritte</div>
+          <div style="max-height: 200px; overflow-y: auto; margin-top: 6px; padding-right: 4px;">
+            ${paroleScritte.map((h, i) => {
+              const sistemica = h.giocatore === '(iniziale)' || h.giocatore === '(pareggio)';
+              return `
+                <div class="text-small" style="margin-top: 4px;${sistemica ? ' opacity: 0.55;' : ''}">
+                  <span class="text-dim">${i + 1}.</span> <strong>${escapeHtml(h.parola)}</strong>${h.giocatore ? ` <span class="text-dim">· ${escapeHtml(h.giocatore)}</span>` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       ${giocatoriRimasti.length > 0 ? `
         <div class="card" style="margin-top: var(--spacing-md); text-align: left;">
           <div class="text-small text-dim">Giocatori rimasti</div>
           ${giocatoriRimasti.map(g => `
             <div class="text-small" style="margin-top: 4px;">
               <span class="${g === mioNome ? 'badge badge-success' : ''}">${escapeHtml(g)}</span>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
-
-      ${history.length > 0 ? `
-        <div class="card" style="margin-top: var(--spacing-md); text-align: left;">
-          <div class="text-small text-dim">Ultime mosse</div>
-          ${history.slice().reverse().map(h => `
-            <div class="text-small" style="margin-top: 4px;">
-              <strong>${escapeHtml(h.giocatore)}</strong>: ${escapeHtml(h.parola)}
             </div>
           `).join('')}
         </div>
@@ -162,7 +168,10 @@ export function attachGameHandlers() {
         }
         if (resp.valida) {
           success();
-          document.getElementById('input-parola').value = '';
+          // Il round può essere già avanzato (re-render che rimuove il form):
+          // l'input potrebbe non esistere più → svuotarlo solo se presente.
+          const inputParola = document.getElementById('input-parola');
+          if (inputParola) inputParola.value = '';
           lastBeepSecond = -1;
         } else {
           if (errorBox) {

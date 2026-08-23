@@ -39,11 +39,12 @@ import { logger } from '../logger.js';
  * @param {string} opzioni.parolaPrecedente
  * @param {string} opzioni.parolaNuova
  * @param {string} [opzioni.gameId] - per rate limit AI
+ * @param {Set<string>} [opzioni.paroleUsate] - parole già usate in questa partita (normalizzate)
  * @param {number} [opzioni.lunghezzaMin=3]
  * @param {number} [opzioni.lunghezzaMax=10]
  * @returns {Promise<RisultatoValidazione>}
  */
-export async function validaMossa({ parolaPrecedente, parolaNuova, gameId, lunghezzaMin = 3, lunghezzaMax = 10 }) {
+export async function validaMossa({ parolaPrecedente, parolaNuova, gameId, paroleUsate, lunghezzaMin = 3, lunghezzaMax = 10 }) {
   // 1. Validazione base (charset, lunghezza)
   const checkBase = validaParola(parolaNuova, lunghezzaMin, lunghezzaMax);
   if (!checkBase.valida) {
@@ -58,6 +59,19 @@ export async function validaMossa({ parolaPrecedente, parolaNuova, gameId, lungh
 
   const normalizzata = checkBase.normalizzata;
   const prev = normalizzaBase(parolaPrecedente);
+
+  // 1.5 Check anti-ripetizione: la parola non deve essere già stata usata
+  //     (prima del check distanza, così il messaggio è specifico). Evita i
+  //     loop infiniti del tipo ARIDO → ARIDI → ARIDO.
+  if (paroleUsate && paroleUsate.has(normalizzata)) {
+    return {
+      valida: false,
+      motivo: 'parola_gia_usata',
+      normalizzata,
+      source: null,
+      messaggio: `"${normalizzata}" è già stata usata in questa partita. Scegli una parola diversa.`,
+    };
+  }
 
   // 2. Check distanza 1 dalla parola precedente
   if (!isDistanzaUno(prev, normalizzata)) {

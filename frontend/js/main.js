@@ -186,6 +186,7 @@ socketOn('round_start', (data) => {
         turno: stato.turno,
         rounds: stato.rounds,
         giocatori: stato.giocatori || partita.giocatori,
+        history: stato.history || partita.history,
       }
     });
     currentTickSecond = -1;

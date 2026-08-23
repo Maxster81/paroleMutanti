@@ -212,6 +212,8 @@ export function attachLobbyHandlers(io, socket) {
                 timeLeft: partita.turnManager.timeLeft,
                 timeLimit: partita.params.turn_seconds,
                 giocatori: partita.giocatori,
+                // M5c: include la catena di parole già usate per la UI
+                history: partita.history,
               });
             }
           }

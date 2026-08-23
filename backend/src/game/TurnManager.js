@@ -21,6 +21,9 @@ export class TurnManager extends EventEmitter {
     this.giocatori = opzioni.giocatori ?? [];
     this.secondiPerTurno = opzioni.secondiPerTurno ?? 30;
     this.parolaIniziale = opzioni.parolaIniziale ?? '';
+    // Riferimento alla catena di parole già usate della partita (per esporla
+    // al client tramite statoCorrente). È lo stesso array di GameManager.
+    this.history = opzioni.history ?? [];
     this.onFineTurno = opzioni.onFineTurno ?? (() => {});
     this.onTick = opzioni.onTick ?? (() => {});
     this.onTimeout = opzioni.onTimeout ?? (() => {});
@@ -164,6 +167,7 @@ export class TurnManager extends EventEmitter {
       rounds: this.rounds.map(r => ({ ...r })),
       currentWord: this.currentWord,
       parolaIniziale: this.parolaIniziale,
+      history: this.history.map(h => ({ ...h })),
       timeLeft: Math.max(0, this.timeLeft),
       timeLimit: this.secondiPerTurno,
     };

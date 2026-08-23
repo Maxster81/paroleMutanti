@@ -19,6 +19,7 @@ import { logger } from '../logger.js';
 import { scegliParolaIniziale } from './WordPicker.js';
 import { validaMossa } from './Validator.js';
 import { TurnManager } from './TurnManager.js';
+import { normalizzaBase } from '../utils/normalizza.js';
 
 // Intervalli sweeper (ms)
 const TIMEOUT_WAITING_MS = 5 * 60 * 1000;       // 5 min
@@ -80,6 +81,7 @@ export class GameManager extends EventEmitter {
       currentWord: null,
       currentPlayerIndex: 0,
       history: [],
+      paroleUsate: new Set(),
       vincitore: null,
       turnManager: null,
       createdAt: new Date(),
@@ -159,12 +161,14 @@ export class GameManager extends EventEmitter {
       partita.startedAt = new Date();
       partita.currentPlayerIndex = 0;
       partita.history = [{ parola: parolaIniziale, giocatore: '(iniziale)', turno: 0, timestamp: Date.now() }];
+      partita.paroleUsate = new Set([normalizzaBase(parolaIniziale)]);
       partita.lastActivityAt = new Date();
 
       const turnManager = new TurnManager({
         giocatori: [...partita.giocatori],
         secondiPerTurno: partita.params.turn_seconds,
         parolaIniziale,
+        history: partita.history,
         onTimeout: () => this._gestisciTimeoutRound(gameId),
         onTick: (timeLeft, roundIdx) => this.emit('tick', { gameId, timeLeft, turno: turnManager.turno, roundIdx }),
         onFineTurno: () => this._gestisciFineTurno(gameId),
@@ -204,6 +208,7 @@ export class GameManager extends EventEmitter {
       parolaPrecedente: partita.currentWord,
       parolaNuova: parola,
       gameId,
+      paroleUsate: partita.paroleUsate,
       lunghezzaMin: 3,
       lunghezzaMax: 10,
     });
@@ -211,6 +216,13 @@ export class GameManager extends EventEmitter {
     if (risultato.valida) {
       partita.turnManager.submitMossa(risultato.normalizzata, nomeGiocatore, risultato);
       partita.currentWord = risultato.normalizzata;
+      partita.paroleUsate.add(risultato.normalizzata);
+      partita.history.push({
+        parola: risultato.normalizzata,
+        giocatore: nomeGiocatore,
+        turno: partita.turnManager.turno,
+        timestamp: Date.now(),
+      });
       partita.lastActivityAt = new Date();
       if (risultato.source === 'AI') partita.aiValidationsCount += 1;
       this.emit('mossa_validata', { gameId, partita, parola: risultato.normalizzata, ai_usata: risultato.ai_usata || false });
@@ -275,6 +287,13 @@ export class GameManager extends EventEmitter {
       this.emit('pareggio', { gameId, turno: partita.turnManager.turno, nuovaParola, parola: nuovaParola });
       partita.turnManager.nuovoTurno(nuovaParola);
       partita.currentWord = nuovaParola;
+      partita.paroleUsate.add(normalizzaBase(nuovaParola));
+      partita.history.push({
+        parola: nuovaParola,
+        giocatore: '(pareggio)',
+        turno: partita.turnManager.turno,
+        timestamp: Date.now(),
+      });
       partita.lastActivityAt = new Date();
       // M5b-fix: turn_update con stato CORRETTO (post-pareggio) per allineare
       // anche i client con socket.js "vecchio" (che ascoltano solo turn_update,
@@ -300,14 +319,10 @@ export class GameManager extends EventEmitter {
     }
 
     // Caso 2b: passati sono 2+ → continua, parola base = ultima passata
+    // (Nota: la parola valida è già stata appesa a history/paroleUsate in
+    // submitParola, quindi qui NON si pusha di nuovo per evitare duplicati.)
     const ultimaPassata = rounds.findLast(r => r.stato === 'passato') || rounds[0];
     const nuovaParola = ultimaPassata.parola;
-    partita.history.push({
-      parola: nuovaParola,
-      giocatore: passati[passati.length - 1],
-      turno: partita.turnManager.turno,
-      timestamp: Date.now(),
-    });
     partita.turnManager.giocatori = passati.filter(n => partita.giocatori.includes(n));
     partita.turnManager.nuovoTurno(nuovaParola);
     partita.currentWord = nuovaParola;
