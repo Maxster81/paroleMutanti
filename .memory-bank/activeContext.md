@@ -129,7 +129,7 @@
 - **Charset**: accettate j/k/w/x/y (prestiti consolidati) ← confermato utente
 - **SemVer attivato (M6)**: `VERSION` = 1.0.0 in root; `package.json` allineato; bump obbligatorio ad ogni commit funzionale (regola .clinerules/04)
 - **Repo produzione**: `paroleMutanti_prod` (pubblico) affiancato in `../paroleMutanti_prod`; popolato via `sync-to-prod.sh` (whitelist, esclude rules/memory-bank/tests/ref personali); deploy con `deploy/deploy.sh`
-- **Caddy via `import`**: i siti stanno in `/etc/caddy/sites/*.conf`, il Caddyfile principale li include con `import`. `deploy.sh --caddy` genera `parole-mutanti.conf` dal template e lo rende idempotente. `--tls-cert/--tls-key` per riusare i certificati esistenti (come `efftrack.maxster.top`), oppure nessuno → Let's Encrypt automatico.
+- **Caddy via `import`**: i siti stanno in `/etc/caddy/sites/*.conf`, il Caddyfile principale li include con `import`. `deploy.sh --caddy` genera `parole-mutanti.conf` dal template e lo rende idempotente. `--tls-cert/--tls-key` per riusare i certificati esistenti (come `efftrack.maxster.top`), oppure nessuno → Let's Encrypt automatico. HSTS **senza** `includeSubDomains` (dominio condiviso: l'HTTPS-only resta solo sul sito, non su tutto `*.maxster.top`).
 - **Porta prod canonica**: 8090 (Caddy `reverse_proxy 127.0.0.1:8090`); dominio placeholder `__DOMAIN__`
 - **HOST prod**: default `127.0.0.1` quando `NODE_ENV=production` (config.js)
 
