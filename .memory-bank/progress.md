@@ -117,7 +117,7 @@
 - [x] `VERSION` = `1.0.0` (SemVer attivato post-M5; `package.json` allineato)
 - [x] Repo pubblico `paroleMutanti_prod` creato, popolato e **pushato** (niente rules/memory-bank/tests/ref personali)
 - [x] `backend/src/config.js`: default `HOST=127.0.0.1` quando `NODE_ENV=production`
-- [ ] Script backup DB (`deploy/backup.sh`)
+- [x] `deploy/backup.sh` (pg_dump + gzip + rotazione 7) + cron automatico installato da `deploy.sh` nel deploy completo (ogni notte alle 3:00)
 - [ ] Deploy reale su server (Caddy TLS, DNS, test produzione)
 
 ### Post-M5 (opzionali / rifiniture)
