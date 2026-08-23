@@ -96,6 +96,15 @@
 - [x] `views/game.js`: pulsante "⏭ Passa il turno" → "⏭ Passa il round"
 - [x] E2E node sync-test: Alice/Bob allineati (stessa parola + turnista) per 27 turni di pareggi; verifica browser senza interazioni (TURNO 1→4, parola `cerei → vinile`, 0 errori console)
 
+### M5c — Regola anti-ripetizione + elenco "Parole già scritte"
+- [x] `Validator.validaMossa` rifiuta parole già usate (`parola_gia_usata`, check prima della distanza) via `paroleUsate` (Set)
+- [x] `GameManager` mantiene `paroleUsate` + `history` (aggiornati a ogni submit valido e sul pareggio)
+- [x] `TurnManager.statoCorrente()` espone `history` → propagata a turn_update/round_start/request_state
+- [x] `partita_avviata` payload include `history`; `main.js` round_start copia `stato.history`
+- [x] UI "📜 Parole già scritte" (catena completa, scrollabile, sopra "Giocatori rimasti") in `views/game.js`
+- [x] Fix ack submit in `views/game.js` (guardia `if (inputParola)` — niente più TypeError dopo re-render)
+- [x] Unit test `backend/tests/validator.test.js` (3 casi) → **31/31**; E2E node reale (`membri`→`membra`, rifiuto `membri`); Playwright browser reale (`1. ariete (iniziale)` → `2. arieti · Alice`, console pulita)
+
 
 ## ❌ Cosa resta da fare
 

@@ -1,7 +1,7 @@
 # Active Context — Focus Corrente
 
 ## 🎯 Focus Corrente
-**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato (game view rifinita, nuova end view, home con lista partite auto-aggiornate). Bug fix backend M5 conclusi (refresh, submit turnista, abbandono multi-giocatore, **desincronizzazione turno/round M5b-fix commit `3437de2`**). Prossimo lavoro: test flusso 4 giocatori + refinements audio + **M6 Deploy**.
+**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (refresh, submit turnista, abbandono multi-giocatore, **desincronizzazione turno/round `3437de2`**, **M5c anti-ripetizione + elenco "Parole già scritte"**). Prossimo lavoro: test flusso 4 giocatori + refinements audio + **M6 Deploy**.
 
 ## ✅ Cosa è stato fatto (riepilogo cronologico)
 
@@ -91,6 +91,16 @@
 - **UX**: `views/game.js` rinomina il pulsante "⏭ Passa il turno" → "⏭ Passa il round".
 - **Verifica**: E2E node (sync-test) Alice/Bob stessa parola+turnista per 27 turni di pareggi → ALLINEATO ✅; browser reale Mario+Bob timeout automatico → `TURNO 1 → TURNO 4 · Round 1/2`, parola `cerei → vinile`, turnista corretto, form attivo solo a chi tocca, "Passa il round". Console 0 errori.
 - **⚠️ Nota sweeper**: i pareggi automatici aggiornano `lastActivityAt` → una partita orfana che fa pareggi continui (0 socket reali) non viene mai ripulita dallo sweeper (richiede `socketConnessi === 0` E `etaSenzaAttivita > 2min`). Attualmente mitigato dal riavvio del server (svuota la RAM). Valutare in futuro un criterio basato sui socket senza contare i pareggi automatici come attività.
+
+### M5c — Regola anti-ripetizione + elenco "Parole già scritte" (✅)
+- **Regola nuova**: un giocatore NON può riscrivere una parola già usata nella stessa partita (evita i loop `ARIDO → ARIDI → ARIDO`).
+  - `Validator.validaMossa` riceve `paroleUsate` (Set di parole normalizzate) e rifiuta con `parola_gia_usata` PRIMA del check di distanza (messaggio specifico).
+  - `GameManager` mantiene `partita.paroleUsate` (Set, lookup O(1)) e `partita.history` (array ordinato), aggiornati a ogni submit valido e sul pareggio.
+- **Elenco parole**: la UI mostra "📜 Parole già scritte" con l'intera catena (iniziale, parole dei giocatori, base da pareggio), scrollabile, **sopra** "Giocatori rimasti" (deciso in plan mode: l'elenco è lo strumento di riferimento del turnista).
+  - `TurnManager.statoCorrente()` ora espone `history` → fluisce a `turn_update`/`round_start`/`request_state`.
+  - `partita_avviata` payload include `history` (lobbyHandler); handler `round_start` di `main.js` copia `stato.history`.
+- **Fix preesistente (M5c)**: in `views/game.js` l'ack di submit non crasha più quando il round avanza e rimuove il form → guardia `if (inputParola)` (prima: `TypeError: Cannot set properties of null (setting 'value')`).
+- **Verifica**: unit test `backend/tests/validator.test.js` (3 casi) → **31/31 test**; E2E node reale (`membri`→`membra`, rifiuto di `membri` con `parola_gia_usata`, history propagata ai client); Playwright browser reale (elenco `1. ariete (iniziale)` → `2. arieti · Alice`, console pulita dopo submit con re-render).
 
 
 ### M5 — Frontend: Game view rifinita + End view + Home lista (✅)
