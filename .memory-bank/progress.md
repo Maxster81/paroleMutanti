@@ -104,6 +104,7 @@
 - [x] UI "📜 Parole già scritte" (catena completa, scrollabile, sopra "Giocatori rimasti", **più recente in cima ma numerazione assoluta 1→N**) in `views/game.js`
 - [x] Fix ack submit in `views/game.js` (guardia `if (inputParola)` — niente più TypeError dopo re-render)
 - [x] Unit test `backend/tests/validator.test.js` (3 casi) → **31/31**; E2E node reale (`membri`→`membra`, rifiuto `membri`); Playwright browser reale (`1. ariete (iniziale)` → `2. arieti · Alice`, console pulita)
+- [x] **Controllo a tre fasi**: `1) DB → 2) morfologia (forme flesse, source 'MORF') → 3) AI`. Nuovo `utils/morfologia.js` (`candidatiFormeBase`); prompt AI su "esiste come lemma o forma flessa"; normalizzazione YES/SÌ/SI. Accetta `oziata`/`oziati` (lemma `oziato`); rifiuta il nonsense via AI. **38/38 test** (+7 in `morfologia.test.js`)
 
 
 ## ❌ Cosa resta da fare

@@ -100,6 +100,11 @@
   - `TurnManager.statoCorrente()` ora espone `history` → fluisce a `turn_update`/`round_start`/`request_state`.
   - `partita_avviata` payload include `history` (lobbyHandler); handler `round_start` di `main.js` copia `stato.history`.
 - **Fix preesistente (M5c)**: in `views/game.js` l'ack di submit non crasha più quando il round avanza e rimuove il form → guardia `if (inputParola)` (prima: `TypeError: Cannot set properties of null (setting 'value')`).
+- **Controllo a TRE fasi (M5c)**: la validazione ora è `1) DB → 2) forme flesse/derivate → 3) AI`.
+  - **Fase 2 (nuova)**: `utils/morfologia.js` (`candidatiFormeBase`) deriva il lemma da forme flesse regolari (femminile/plurale/participio) e lo verifica nel DB (`source='MORF'`). Risolve i falsi negativi dell'AI su parole come `oziata`/`oziati` → lemma `oziato` (presente nel DB).
+  - **Fase 3 (AI)**: solo se nemmeno il lemma è nel DB. Prompt cambiato da "di senso compiuto" a "esiste come lemma o forma flessa"; normalizzazione risposta robusta a YES/SÌ/SI (inglese o italiano, univoca).
+  - **Verifica**: 38/38 test (7 nuovi in `morfologia.test.js`); validaMossa diretto: `oziato→oziata` e `oziato→oziati` → `source=MORF, lemma=oziato`; `oziato→oziatq` → AI la rifiuta.
+  - **Nota**: l'LLM (DeepSeek) si è dimostrato incoerente sulle forme flesse (chat log: si contraddice, inventa esempi sbagliati) → la morfologia deterministica lo rimuove dal percorso delle forme comuni.
 - **Verifica**: unit test `backend/tests/validator.test.js` (3 casi) → **31/31 test**; E2E node reale (`membri`→`membra`, rifiuto di `membri` con `parola_gia_usata`, history propagata ai client); Playwright browser reale (elenco `1. ariete (iniziale)` → `2. arieti · Alice`, console pulita dopo submit con re-render).
 
 
