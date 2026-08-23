@@ -96,7 +96,7 @@
 - **Regola nuova**: un giocatore NON può riscrivere una parola già usata nella stessa partita (evita i loop `ARIDO → ARIDI → ARIDO`).
   - `Validator.validaMossa` riceve `paroleUsate` (Set di parole normalizzate) e rifiuta con `parola_gia_usata` PRIMA del check di distanza (messaggio specifico).
   - `GameManager` mantiene `partita.paroleUsate` (Set, lookup O(1)) e `partita.history` (array ordinato), aggiornati a ogni submit valido e sul pareggio.
-- **Elenco parole**: la UI mostra "📜 Parole già scritte" con l'intera catena (iniziale, parole dei giocatori, base da pareggio), scrollabile, **sopra** "Giocatori rimasti" (deciso in plan mode: l'elenco è lo strumento di riferimento del turnista).
+- **Elenco parole**: la UI mostra "📜 Parole già scritte" con l'intera catena (iniziale, parole dei giocatori, base da pareggio), scrollabile, **sopra** "Giocatori rimasti" (deciso in plan mode: l'elenco è lo strumento di riferimento del turnista). Ordinata con **più recente in cima** ma numerazione assoluta 1→N (1 = iniziale).
   - `TurnManager.statoCorrente()` ora espone `history` → fluisce a `turn_update`/`round_start`/`request_state`.
   - `partita_avviata` payload include `history` (lobbyHandler); handler `round_start` di `main.js` copia `stato.history`.
 - **Fix preesistente (M5c)**: in `views/game.js` l'ack di submit non crasha più quando il round avanza e rimuove il form → guardia `if (inputParola)` (prima: `TypeError: Cannot set properties of null (setting 'value')`).

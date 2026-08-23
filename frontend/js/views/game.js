@@ -92,7 +92,10 @@ export function renderGame(params = {}) {
         <div class="card" style="margin-top: var(--spacing-md); text-align: left;">
           <div class="text-small text-dim">📜 Parole già scritte</div>
           <div style="max-height: 200px; overflow-y: auto; margin-top: 6px; padding-right: 4px;">
-            ${paroleScritte.map((h, i) => {
+            ${[...paroleScritte].reverse().map((h, j) => {
+              // Inversione: la più recente in cima, ma numerazione ASSOLUTA
+              // (1 = prima parola, ultimo numero = totale della catena).
+              const i = paroleScritte.length - 1 - j;
               const sistemica = h.giocatore === '(iniziale)' || h.giocatore === '(pareggio)';
               return `
                 <div class="text-small" style="margin-top: 4px;${sistemica ? ' opacity: 0.55;' : ''}">

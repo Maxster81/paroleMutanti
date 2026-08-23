@@ -101,7 +101,7 @@
 - [x] `GameManager` mantiene `paroleUsate` + `history` (aggiornati a ogni submit valido e sul pareggio)
 - [x] `TurnManager.statoCorrente()` espone `history` → propagata a turn_update/round_start/request_state
 - [x] `partita_avviata` payload include `history`; `main.js` round_start copia `stato.history`
-- [x] UI "📜 Parole già scritte" (catena completa, scrollabile, sopra "Giocatori rimasti") in `views/game.js`
+- [x] UI "📜 Parole già scritte" (catena completa, scrollabile, sopra "Giocatori rimasti", **più recente in cima ma numerazione assoluta 1→N**) in `views/game.js`
 - [x] Fix ack submit in `views/game.js` (guardia `if (inputParola)` — niente più TypeError dopo re-render)
 - [x] Unit test `backend/tests/validator.test.js` (3 casi) → **31/31**; E2E node reale (`membri`→`membra`, rifiuto `membri`); Playwright browser reale (`1. ariete (iniziale)` → `2. arieti · Alice`, console pulita)
 
