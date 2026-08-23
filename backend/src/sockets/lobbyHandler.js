@@ -29,6 +29,25 @@ const rateLimiterLobby = creaRateLimiter({ max: 10, windowMs: 1000 });
 const socketToGame = new Map();
 
 /**
+ * Fa "entrare" un socket in una partita esistente: lo registra nel tracking
+ * socketToGame, lo unisce alla room lobby/game e lo segnala al GameManager.
+ *
+ * Usato sia da create_game/join_game sia da request_state (M5-bugfix3),
+ * così dopo un refresh il nuovo socket torna a ricevere i broadcast.
+ *
+ * @param {import('socket.io').Socket} socket - socket del client
+ * @param {string} gameId - id partita
+ * @param {object} partita - oggetto partita (per dedurre lo stato)
+ */
+export function registraSocketInPartita(socket, gameId, partita) {
+  socketToGame.set(socket.id, gameId);
+  const room = partita && partita.state === 'running' ? `game:${gameId}` : `lobby:${gameId}`;
+  socket.join(room);
+  gameManager.registraSocket(gameId, socket.id);
+  logger.info('socket_riagganciato', { socketId: socket.id, gameId, room, state: partita?.state });
+}
+
+/**
  * Broadcast helper: invia evento a tutti i socket presenti in una partita.
  */
 export function broadcastAPartita(io, gameId, evento, payload) {
@@ -142,6 +161,14 @@ export function attachLobbyHandlers(io, socket) {
         } else {
           broadcastAPartita(io, gameId, 'lobby_updated', partitaPerLobby(partita));
         }
+      }
+    } else if (partita.state === 'running') {
+      // M5-bugfix3: abbandono durante la partita. Se resta 1 solo giocatore
+      // viene decretato il vincitore (o la partita cancellata se nessuno);
+      // altrimenti il turno passa correttamente al giocatore successivo.
+      const risultatoAbbandono = gameManager.abbandonaGiocatore(gameId, payload?.nome);
+      if (risultatoAbbandono.ok) {
+        logger.info('giocatore_abbandonato_in_partita', { socketId: socket.id, gameId, nome: payload?.nome });
       }
     }
 

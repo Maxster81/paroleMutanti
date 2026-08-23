@@ -12,7 +12,7 @@
 import { gameManager } from '../game/GameManager.js';
 import { logger } from '../logger.js';
 import { creaRateLimiter } from '../utils/rateLimiter.js';
-import { broadcastAPartita } from './lobbyHandler.js';
+import { broadcastAPartita, registraSocketInPartita } from './lobbyHandler.js';
 
 const rateLimiterSubmit = creaRateLimiter({ max: 5, windowMs: 1000 });
 
@@ -106,9 +106,18 @@ export function attachGameHandlers(io, socket) {
     const partita = gameId ? gameManager.getPartita(gameId) : null;
     if (!partita) return ack?.({ ok: false, errore: 'partita_non_trovata' });
 
+    // M5-bugfix3: al refresh (nuovo socket) il socket NON è nella room né
+    // registrato nel tracking socketToGame. Senza questo ri-aggancio, i
+    // broadcast (io.to(socketId)) non raggiungono più il client dopo il
+    // refresh → counter fermo, mosse degli altri non visibili.
+    registraSocketInPartita(socket, gameId, partita);
+
+    // M5-bugfix3: include id/gameId nello stato. Senza di essi, dopo il
+    // refresh la view game invierebbe submit_word con gameId undefined
+    // → server risponde "parametri_mancanti" → errore generico lato client.
     const stato = partita.turnManager
-      ? { ...partita.turnManager.statoCorrente(), state: partita.state, vincitore: partita.vincitore, giocatori: partita.giocatori }
-      : { state: partita.state, giocatori: partita.giocatori, ready: partita.ready, params: partita.params };
+      ? { id: partita.id, gameId: partita.id, ...partita.turnManager.statoCorrente(), state: partita.state, vincitore: partita.vincitore, giocatori: partita.giocatori }
+      : { id: partita.id, gameId: partita.id, state: partita.state, giocatori: partita.giocatori, ready: partita.ready, params: partita.params };
     ack?.({ ok: true, stato });
   });
 }
@@ -122,6 +131,24 @@ export function setupGameManagerBroadcast(io) {
     broadcastAPartita(io, gameId, 'mossa_rifiutata', { gameId, parola, motivo });
   });
 
+  gameManager.on('round_passato', ({ gameId, giocatore, parola, source }) => {
+    broadcastAPartita(io, gameId, 'round_passato', { gameId, giocatore, parola, source });
+  });
+  gameManager.on('round_limbo', ({ gameId, giocatore }) => {
+    broadcastAPartita(io, gameId, 'round_limbo', { gameId, giocatore });
+  });
+  gameManager.on('round_start', ({ gameId, stato }) => {
+    broadcastAPartita(io, gameId, 'round_start', { gameId, stato });
+  });
+  gameManager.on('pareggio', ({ gameId, turno, nuovaParola, parola }) => {
+    broadcastAPartita(io, gameId, 'pareggio', { gameId, turno, parola: nuovaParola || parola });
+  });
+  gameManager.on('turno_finito', ({ gameId, roundRisultati }) => {
+    broadcastAPartita(io, gameId, 'turno_finito', { gameId, roundRisultati });
+  });
+  gameManager.on('turn_update', ({ gameId, stato }) => {
+    broadcastAPartita(io, gameId, 'turn_update', { gameId, ...stato });
+  });
   gameManager.on('turn_change', ({ gameId, stato }) => {
     broadcastAPartita(io, gameId, 'turn_update', { gameId, ...stato });
   });

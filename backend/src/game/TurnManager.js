@@ -1,16 +1,13 @@
 /**
- * TurnManager.js — Gestione turni e timer di una partita
+ * TurnManager.js — Gestione turni e round di una partita
  *
- * Responsabilità:
- * - Traccia il giocatore di turno corrente
- * - Gestisce il timer (countdown)
- * - Gestisce timeout (turno scaduto → passa al prossimo giocatore o fine)
- * - Supporta pause/resume per operazioni lunghe (es. validazione AI)
- * - Espone eventi (tick, timeout, changeTurn) tramite EventEmitter
- *
- * Approccio "ottimistico" (lockless): gli eventi arrivano in ordine,
- * non serve serializzazione. Se due submit arrivano contemporaneamente,
- * il primo elaborato vince (è OK per un gioco realtime).
+ * Modello a round sequenziali con evoluzione a catena della parola:
+ * - Un turno è composto da N round (N = numero di giocatori attivi nel turno).
+ * - Ogni round ha un giocatore "di turno" che ha TOT secondi per rispondere.
+ * - La parola del turno evolve SOLO quando un giocatore passa un round (parola valida).
+ * - Se il giocatore non risponde entro il timeout → limbo (NON eliminato subito).
+ * - A fine turno si applicano le regole di pareggio/eliminazione/vittoria
+ *   (vedi GameManager._fineTurno).
  *
  * @module backend/src/game/TurnManager
  */
@@ -24,124 +21,157 @@ export class TurnManager extends EventEmitter {
     this.giocatori = opzioni.giocatori ?? [];
     this.secondiPerTurno = opzioni.secondiPerTurno ?? 30;
     this.parolaIniziale = opzioni.parolaIniziale ?? '';
+    this.onFineTurno = opzioni.onFineTurno ?? (() => {});
+    this.onTick = opzioni.onTick ?? (() => {});
     this.onTimeout = opzioni.onTimeout ?? (() => {});
 
-    this.currentPlayerIndex = 0;
+    this.turno = 0;             // contatore turni (incrementa a ogni fine turno)
+    this.rounds = [];           // array di risultati round del turno corrente
     this.currentWord = this.parolaIniziale;
+    this.currentPlayerIndex = 0;
+    this.currentRoundIndex = 0;
     this.timeLeft = this.secondiPerTurno;
-    this.turno = 0;
-    this.history = [];
     this.timerInterval = null;
     this.attivo = false;
-    this.inPausa = false;
   }
 
   start() {
     if (this.attivo) return;
     this.attivo = true;
-    this.inPausa = false;
     this.turno = 1;
+    this.currentWord = this.parolaIniziale;
+    this.rounds = [];
+    this.currentRoundIndex = 0;
+    this._avviaRoundCorrente();
+    logger.info('turno_avviato', { turno: this.turno, parola: this.currentWord });
+  }
+
+  /**
+   * Avvia il round del giocatore corrente (timer + tick).
+   */
+  _avviaRoundCorrente() {
     this.timeLeft = this.secondiPerTurno;
-    this.history.push({
-      parola: this.parolaIniziale,
-      giocatore: '(iniziale)',
-      turno: 0,
-      timestamp: Date.now(),
-    });
+    this.emit('round_start', this.statoCorrente());
     this._avviaTimer();
-    this.emit('turn_start', this.statoCorrente());
-    logger.info('turno_avviato', { turno: this.turno, giocatore: this.giocatoreCorrente() });
   }
 
-  pause() {
-    if (!this.attivo || this.inPausa) return;
-    this.inPausa = true;
-    this._fermaTimer();
-    this.emit('paused', { timeLeft: this.timeLeft, motivo: 'validazione_in_corso' });
-    logger.debug('turno_in_pausa', { timeLeft: this.timeLeft });
-  }
-
-  resume() {
-    if (!this.attivo || !this.inPausa) return;
-    this.inPausa = false;
-    this._avviaTimer();
-    this.emit('resumed', { timeLeft: this.timeLeft });
-    logger.debug('turno_ripreso', { timeLeft: this.timeLeft });
-  }
-
-  submitMossa(parola, giocatore) {
+  /**
+   * Processa un submit del giocatore corrente. Se valido, marca "passato" e
+   * la parola evolve. Poi passa al prossimo round (o chiude il turno).
+   *
+   * @param {string} parola
+   * @param {string} giocatore
+   * @param {object} infoValidazione - { valida, normalizzata, source, ... }
+   * @returns {{ok: boolean, valida: boolean, motivo?: string, normalizzata?: string}}
+   */
+  submitMossa(parola, giocatore, infoValidazione) {
     if (!this.attivo) {
-      logger.warn('submit_ignorato_turno_non_attivo', { parola });
-      return;
+      return { ok: false, valida: false, motivo: 'turno_non_attivo' };
     }
-    this.history.push({
-      parola,
+    const giocatoreAtteso = this.giocatoreCorrente();
+    if (giocatore !== giocatoreAtteso) {
+      return { ok: false, valida: false, motivo: 'non_di_turno' };
+    }
+    if (!infoValidazione?.valida) {
+      // Mossa rifiutata: il round resta aperto, ma la parola non evolve.
+      return { ok: true, valida: false, motivo: infoValidazione?.motivo };
+    }
+
+    const normalizzata = infoValidazione.normalizzata || parola;
+    this.rounds.push({
       giocatore,
-      turno: this.turno,
-      timestamp: Date.now(),
+      stato: 'passato',
+      parola: normalizzata,
+      source: infoValidazione.source || null,
     });
-    this.currentWord = parola;
-    this._prossimoTurno();
+    this.currentWord = normalizzata;
+    this.emit('round_passato', { giocatore, parola: normalizzata, source: infoValidazione.source });
+
+    this._fermaTimer();
+    this._avanti();
+    return { ok: true, valida: true, normalizzata };
   }
 
+  /**
+   * Il giocatore corrente passa (skip) il turno: marcato in limbo e
+   * si passa immediatamente al prossimo round (senza aspettare il timer).
+   */
   passaTurno(giocatore) {
+    if (!this.attivo) return false;
+    if (giocatore !== this.giocatoreCorrente()) return false;
+    this.timeoutRound();
+    return true;
+  }
+
+  /**
+   * Timeout del round corrente: marca il giocatore in limbo, poi passa avanti.
+   */
+  timeoutRound() {
     if (!this.attivo) return;
-    if (this.inPausa) {
-      logger.warn('passa_turno_in_pausa_ignorato');
-      return;
+    const giocatore = this.giocatoreCorrente();
+    if (!giocatore) return;
+
+    this.rounds.push({ giocatore, stato: 'limbo', parola: this.currentWord });
+    this.emit('round_limbo', { giocatore });
+    this._fermaTimer();
+    this._avanti();
+  }
+
+  /**
+   * Passa al prossimo round, oppure chiude il turno se non ce ne sono più.
+   */
+  _avanti() {
+    this.currentRoundIndex += 1;
+    if (this.currentRoundIndex >= this.giocatori.length) {
+      // Turno finito
+      this.attivo = false;
+      this._fermaTimer();
+      this.emit('turno_finito', { roundRisultati: [...this.rounds] });
+      this.onFineTurno();
+    } else {
+      this._avviaRoundCorrente();
     }
-    const expected = this.giocatoreCorrente();
-    if (giocatore !== expected) {
-      logger.warn('passa_turno_non_corrente', { chi: giocatore, expected });
-      return;
-    }
-    logger.info('turno_passato', { giocatore });
-    this.timeLeft = 0;
-    this._onTickTimeout();
+  }
+
+  /**
+   * Inizia un nuovo turno (dopo pareggio o round normale).
+   * Tiene gli stessi giocatori, sceglie una nuova parola base.
+   *
+   * @param {string} nuovaParolaBase
+   */
+  nuovoTurno(nuovaParolaBase) {
+    this.turno += 1;
+    this.currentWord = nuovaParolaBase;
+    this.rounds = [];
+    this.currentRoundIndex = 0;
+    this.attivo = true;
+    this._avviaRoundCorrente();
+    logger.info('turno_avviato', { turno: this.turno, parola: this.currentWord });
+  }
+
+  giocatoreCorrente() {
+    return this.giocatori[this.currentRoundIndex] ?? null;
+  }
+
+  statoCorrente() {
+    return {
+      turno: this.turno,
+      round: this.currentRoundIndex + 1,
+      roundsTotali: this.giocatori.length,
+      giocatore: this.giocatoreCorrente(),
+      giocatoreIndex: this.currentRoundIndex,
+      giocatori: [...this.giocatori],
+      rounds: this.rounds.map(r => ({ ...r })),
+      currentWord: this.currentWord,
+      parolaIniziale: this.parolaIniziale,
+      timeLeft: Math.max(0, this.timeLeft),
+      timeLimit: this.secondiPerTurno,
+    };
   }
 
   stop() {
     this.attivo = false;
     this._fermaTimer();
-  }
-
-  /**
-   * Ritorna lo stato corrente (per broadcast via socket).
-   * Include sia `parolaCorrente` (nome interno) che `currentWord` (alias
-   * per compatibilità frontend).
-   */
-  statoCorrente() {
-    return {
-      turno: this.turno,
-      giocatore: this.giocatoreCorrente(),
-      giocatoreIndex: this.currentPlayerIndex,
-      parolaCorrente: this.currentWord,
-      currentWord: this.currentWord,
-      timeLeft: Math.max(0, this.timeLeft),
-      timeLimit: this.secondiPerTurno,
-      inPausa: this.inPausa,
-      history: [...this.history],
-    };
-  }
-
-  giocatoreCorrente() {
-    return this.giocatori[this.currentPlayerIndex] ?? null;
-  }
-
-  _prossimoIndice() {
-    return (this.currentPlayerIndex + 1) % this.giocatori.length;
-  }
-
-  _prossimoTurno() {
-    this.currentPlayerIndex = this._prossimoIndice();
-    this.turno += 1;
-    this.timeLeft = this.secondiPerTurno;
-    this._avviaTimer();
-    this.emit('turn_change', this.statoCorrente());
-    logger.info('turno_cambiato', {
-      turno: this.turno,
-      giocatore: this.giocatoreCorrente(),
-    });
   }
 
   _avviaTimer() {
@@ -154,22 +184,17 @@ export class TurnManager extends EventEmitter {
       this._fermaTimer();
       return;
     }
-    if (this.inPausa) return;
     this.timeLeft -= 1;
-    this.emit('tick', { timeLeft: this.timeLeft, turno: this.turno });
+    this.onTick(this.timeLeft, this.currentRoundIndex);
     if (this.timeLeft <= 10 && this.timeLeft > 0) {
       this.emit('beep', { timeLeft: this.timeLeft });
     }
     if (this.timeLeft <= 0) {
-      this._onTickTimeout();
+      this._fermaTimer();
+      this.onTimeout();
+      // Marca il round corrente in limbo e passa al prossimo
+      this.timeoutRound();
     }
-  }
-
-  _onTickTimeout() {
-    if (!this.attivo) return;
-    logger.info('turno_scaduto', { giocatore: this.giocatoreCorrente() });
-    this.emit('timeout', { giocatore: this.giocatoreCorrente() });
-    this.onTimeout(this.currentPlayerIndex);
   }
 
   _fermaTimer() {

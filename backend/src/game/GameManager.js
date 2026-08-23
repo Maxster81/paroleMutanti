@@ -165,13 +165,16 @@ export class GameManager extends EventEmitter {
         giocatori: [...partita.giocatori],
         secondiPerTurno: partita.params.turn_seconds,
         parolaIniziale,
-        onTimeout: (idxGiocatore) => this._gestisciTimeout(gameId, idxGiocatore),
+        onTimeout: () => this._gestisciTimeoutRound(gameId),
+        onTick: (timeLeft, roundIdx) => this.emit('tick', { gameId, timeLeft, turno: turnManager.turno, roundIdx }),
+        onFineTurno: () => this._gestisciFineTurno(gameId),
       });
 
-      turnManager.on('turn_change', (stato) => this.emit('turn_change', { gameId, stato }));
-      turnManager.on('tick', (data) => this.emit('tick', { gameId, ...data }));
+      turnManager.on('round_start', (stato) => this.emit('round_start', { gameId, stato }));
+      turnManager.on('round_passato', (data) => this.emit('round_passato', { gameId, ...data }));
+      turnManager.on('round_limbo', (data) => this.emit('round_limbo', { gameId, ...data }));
+      turnManager.on('turno_finito', (data) => this.emit('turno_finito', { gameId, ...data }));
       turnManager.on('beep', (data) => this.emit('beep', { gameId, ...data }));
-      turnManager.on('timeout', (data) => this.emit('timeout', { gameId, ...data }));
       turnManager.on('paused', (data) => this.emit('paused', { gameId, ...data }));
       turnManager.on('resumed', (data) => this.emit('resumed', { gameId, ...data }));
 
@@ -206,14 +209,8 @@ export class GameManager extends EventEmitter {
     });
 
     if (risultato.valida) {
-      partita.turnManager.submitMossa(risultato.normalizzata, nomeGiocatore);
+      partita.turnManager.submitMossa(risultato.normalizzata, nomeGiocatore, risultato);
       partita.currentWord = risultato.normalizzata;
-      partita.history.push({
-        parola: risultato.normalizzata,
-        giocatore: nomeGiocatore,
-        turno: partita.turnManager.turno,
-        timestamp: Date.now(),
-      });
       partita.lastActivityAt = new Date();
       if (risultato.source === 'AI') partita.aiValidationsCount += 1;
       this.emit('mossa_validata', { gameId, partita, parola: risultato.normalizzata, ai_usata: risultato.ai_usata || false });
@@ -243,15 +240,105 @@ export class GameManager extends EventEmitter {
     return { ok: true };
   }
 
-  _gestisciTimeout(gameId, idxGiocatore) {
+  /**
+   * Timeout di un singolo round: il TurnManager ha già marcato il giocatore
+   * in limbo e incrementato il round. Qui emettiamo l'evento per i client.
+   * La valutazione vera (elim/pareggio/vittoria) avviene in _gestisciFineTurno.
+   */
+  _gestisciTimeoutRound(gameId) {
+    const partita = this.partite.get(gameId);
+    if (!partita || partita.state !== 'running') return;
+    this.emit('turno_scaduto', { gameId, giocatore: partita.turnManager?.giocatoreCorrente() });
+  }
+
+  /**
+   * Fine turno: applica le regole del modello round/turno/limbo.
+   *  - Tutti in limbo → pareggio, nuova parola base, tutti restano in gioco.
+   *  - Almeno un passato → i limbo vengono eliminati; se i passati sono 1 solo,
+   *    quello vince; altrimenti prosegue con l'ultima parola valida.
+   */
+  async _gestisciFineTurno(gameId) {
+    const partita = this.partite.get(gameId);
+    if (!partita || partita.state !== 'running') return;
+
+    const rounds = partita.turnManager.rounds;
+    const passati = rounds.filter(r => r.stato === 'passato').map(r => r.giocatore);
+    const limbi = rounds.filter(r => r.stato === 'limbo').map(r => r.giocatore);
+
+    // Caso 1: tutti in limbo → pareggio
+    if (passati.length === 0) {
+      logger.info('pareggio', { gameId, turno: partita.turnManager.turno });
+      const nuovaParola = await scegliParolaIniziale(
+        partita.params.initial_length_min,
+        partita.params.initial_length_max
+      );
+      this.emit('pareggio', { gameId, turno: partita.turnManager.turno, nuovaParola, parola: nuovaParola });
+      partita.turnManager.nuovoTurno(nuovaParola);
+      partita.currentWord = nuovaParola;
+      partita.lastActivityAt = new Date();
+      return;
+    }
+
+    // Caso 2: almeno un passato → limbo eliminati
+    for (const nome of limbi) {
+      const idx = partita.giocatori.indexOf(nome);
+      if (idx === -1) continue;
+      partita.giocatori.splice(idx, 1);
+      if (partita.turnManager) partita.turnManager.giocatori.splice(idx, 1);
+      this.emit('giocatore_eliminato', { gameId, nome, partita });
+    }
+
+    // Caso 2a: passati sono 1 solo → vince
+    if (passati.length === 1 && partita.giocatori.length === 1) {
+      this._finePartita(gameId, partita.giocatori[0]);
+      return;
+    }
+
+    // Caso 2b: passati sono 2+ → continua, parola base = ultima passata
+    const ultimaPassata = rounds.findLast(r => r.stato === 'passato') || rounds[0];
+    const nuovaParola = ultimaPassata.parola;
+    partita.history.push({
+      parola: nuovaParola,
+      giocatore: passati[passati.length - 1],
+      turno: partita.turnManager.turno,
+      timestamp: Date.now(),
+    });
+    partita.turnManager.giocatori = passati.filter(n => partita.giocatori.includes(n));
+    partita.turnManager.nuovoTurno(nuovaParola);
+    partita.currentWord = nuovaParola;
+    partita.lastActivityAt = new Date();
+    this.emit('turn_update', { gameId, stato: partita.turnManager.statoCorrente() });
+  }
+
+  /**
+   * Wrapper per compatibilità con il codice esistente (evento timeout che
+   * il TurnManager non emette più).
+   */
+  _gestisciTimeout(gameId) {
+    const partita = this.partite.get(gameId);
+    if (!partita || partita.state !== 'running') return;
+    this.emit('turno_scaduto', { gameId });
+  }
+
+  /**
+   * Elimina un giocatore da una partita in corso per qualsivoglia motivo
+   * (timeout o abbandono volontario). Se resta un solo giocatore → vince;
+   * se non ne resta nessuno → partita cancellata; altrimenti il turno passa
+   * correttamente al successivo.
+   *
+   * @param {string} gameId
+   * @param {number} idxGiocatore - indice del giocatore da eliminare
+   * @param {'timeout'|'abbandono'} motivo
+   */
+  _eliminaGiocatore(gameId, idxGiocatore, motivo) {
     const partita = this.partite.get(gameId);
     if (!partita || partita.state !== 'running') return;
 
     const nomeEliminato = partita.giocatori[idxGiocatore];
-    logger.info('giocatore_eliminato_timeout', { gameId, nome: nomeEliminato });
+    logger.info('giocatore_eliminato', { gameId, nome: nomeEliminato, motivo });
 
     partita.giocatori.splice(idxGiocatore, 1);
-    partita.turnManager.giocatori.splice(idxGiocatore, 1);
+    if (partita.turnManager) partita.turnManager.giocatori.splice(idxGiocatore, 1);
 
     this.emit('giocatore_eliminato', { gameId, nome: nomeEliminato, partita });
 
@@ -260,13 +347,54 @@ export class GameManager extends EventEmitter {
     } else if (partita.giocatori.length === 0) {
       this._cancellaPartita(gameId);
     } else {
-      const nuovoIndice = idxGiocatore % partita.giocatori.length;
+      const nuovoIndice = (idxGiocatore) % partita.giocatori.length;
       partita.turnManager.currentPlayerIndex = nuovoIndice;
       partita.turnManager.timeLeft = partita.params.turn_seconds;
       partita.turnManager.turno += 1;
       partita.turnManager._avviaTimer();
       this.emit('turn_change', { gameId, stato: partita.turnManager.statoCorrente() });
     }
+  }
+
+  /**
+   * Gestisce l'abbandono volontario di un giocatore durante una partita
+   * in corso. Delegato da `leave_game` quando la partita è running.
+   *
+   * @param {string} gameId
+   * @param {string} nomeGiocatore
+   */
+  abbandonaGiocatore(gameId, nomeGiocatore) {
+    const partita = this.partite.get(gameId);
+    if (!partita) return { ok: false, errore: 'partita_non_trovata' };
+    if (partita.state !== 'running') return { ok: false, errore: 'partita_non_in_corso' };
+
+    const idx = partita.giocatori.indexOf(nomeGiocatore);
+    if (idx === -1) return { ok: false, errore: 'giocatore_non_in_partita' };
+
+    if (partita.giocatori.length === 2) {
+      // Regola speciale: in 2 giocatori, abbandono = l'altro vince subito.
+      this._eliminaGiocatore(gameId, idx, 'abbandono');
+      return { ok: true };
+    }
+
+    // Altrimenti: marca come abbandono, ma niente _eliminaGiocatore diretto.
+    // A fine turno (_gestisciFineTurno) verrà valutato:
+    //  - se l'altro/i giocatori restanti passano il loro round → gli
+    //    abbandonati sono trattati come limbo → eliminati a fine turno.
+    //  - se nessun altro passa → pareggio.
+    //  - se dopo elim ne resta 1 solo → quello vince.
+    partita.giocatori.splice(idx, 1);
+    if (partita.turnManager) {
+      partita.turnManager.giocatori.splice(idx, 1);
+    }
+    this.emit('giocatore_eliminato', { gameId, nome: nomeGiocatore, partita });
+    // Se dopo la rimozione ne resta 1 solo, chiudi la partita subito.
+    if (partita.giocatori.length === 1) {
+      this._finePartita(gameId, partita.giocatori[0]);
+    } else if (partita.giocatori.length === 0) {
+      this._cancellaPartita(gameId);
+    }
+    return { ok: true };
   }
 
   _finePartita(gameId, vincitore) {
