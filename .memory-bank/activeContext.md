@@ -1,7 +1,7 @@
 # Active Context — Focus Corrente
 
 ## 🎯 Focus Corrente
-**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato (game view rifinita, nuova end view, home con lista partite auto-aggiornate). Bug fix backend M5 conclusi (refresh, submit turnista, abbandono multi-giocatore). Prossimo lavoro: test flusso 4 giocatori + refinements audio + **M6 Deploy**.
+**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato (game view rifinita, nuova end view, home con lista partite auto-aggiornate). Bug fix backend M5 conclusi (refresh, submit turnista, abbandono multi-giocatore, **desincronizzazione turno/round M5b-fix commit `3437de2`**). Prossimo lavoro: test flusso 4 giocatori + refinements audio + **M6 Deploy**.
 
 ## ✅ Cosa è stato fatto (riepilogo cronologico)
 
@@ -82,6 +82,16 @@
   - **Abbandono**: 2 giocatori → l'altro vince subito; ≥3 → si prosegue, valutazione a fine turno.
 - **Test E2E**: 3 turni tutti in limbo → pareggio + nuova parola (PASS).
 - **Eventi socket**: `round_passato`, `round_limbo`, `round_start`, `pareggio`, `turno_finito`.
+### M5b-fix — Desincronizzazione turno/round tra client (✅ commit 3437de2)
+- **Bug 1 (frontend)**: `frontend/js/socket.js` aveva una lista `EVENTI` che NON includeva `round_start`, `pareggio`, `round_*` → il client, pur avendo i listener in `main.js`, non riceveva mai la nuova parola né l'aggiornamento turno/round dopo un pareggio (schermo "bloccato" sulla parola vecchia, "entrambi attivi", mossa rifiutata).
+- **Fix 1**: aggiunti a `EVENTI` gli eventi mancanti (`round_start`, `round_passato`, `round_limbo`, `pareggio`, `turno_finito`).
+- **Bug 2 (backend)**: `gameHandler.js` emetteva `turn_update` "stale" (stato calcolato PRIMA che l'async `_gestisciFineTurno` completasse il pareggio), sovrascrivendo lo stato corretto.
+- **Fix 2**: `turn_update` ora emesso solo se `turnManager.attivo === true`; quando il round chiude il turno lo stato corretto arriva da GameManager.
+- **Fix 3**: `GameManager.js` nel caso pareggio emette un `turn_update` con stato CORRETTO (post-`nuovoTurno`) per allineare anche i client che ascoltano solo `turn_update`.
+- **UX**: `views/game.js` rinomina il pulsante "⏭ Passa il turno" → "⏭ Passa il round".
+- **Verifica**: E2E node (sync-test) Alice/Bob stessa parola+turnista per 27 turni di pareggi → ALLINEATO ✅; browser reale Mario+Bob timeout automatico → `TURNO 1 → TURNO 4 · Round 1/2`, parola `cerei → vinile`, turnista corretto, form attivo solo a chi tocca, "Passa il round". Console 0 errori.
+- **⚠️ Nota sweeper**: i pareggi automatici aggiornano `lastActivityAt` → una partita orfana che fa pareggi continui (0 socket reali) non viene mai ripulita dallo sweeper (richiede `socketConnessi === 0` E `etaSenzaAttivita > 2min`). Attualmente mitigato dal riavvio del server (svuota la RAM). Valutare in futuro un criterio basato sui socket senza contare i pareggi automatici come attività.
+
 
 ### M5 — Frontend: Game view rifinita + End view + Home lista (✅)
 - **Home**: lista partite visibile di default (rimosso il pulsante), **polling 5s** tramite `list_games`, auto-fermo quando si lascia la home.

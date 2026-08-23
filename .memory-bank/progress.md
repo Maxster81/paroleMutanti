@@ -89,6 +89,13 @@
 - [x] Abbandono durante partita running (2 giocatori): resta 1 solo → decretato il vincitore (`game_over`). Test E2E passato (Alice vince dopo abbandono di Bob)
 - [x] Nuovo metodo `GameManager.abbandonaGiocatore()` + `_eliminaGiocatore()` centralizzato (riusa logica timeout)
 - [x] `leave_game` ora gestisce anche lo stato `running`, non solo `waiting`
+### M5b-fix — Desincronizzazione turno/round (commit 3437de2)
+- [x] `socket.js`: aggiunti a `EVENTI` `round_start`, `round_passato`, `round_limbo`, `pareggio`, `turno_finito` (erano mancanti → nuova parola/turno mai ricevuti dopo un pareggio)
+- [x] `gameHandler.js`: `turn_update` emesso solo se `turnManager.attivo === true` (niente più stato "stale" che sovrascriveva il pareggio)
+- [x] `GameManager.js`: `turn_update` con stato CORRETTO post-`nuovoTurno` nel caso pareggio (allinea i client che ascoltano solo `turn_update`)
+- [x] `views/game.js`: pulsante "⏭ Passa il turno" → "⏭ Passa il round"
+- [x] E2E node sync-test: Alice/Bob allineati (stessa parola + turnista) per 27 turni di pareggi; verifica browser senza interazioni (TURNO 1→4, parola `cerei → vinile`, 0 errori console)
+
 
 ## ❌ Cosa resta da fare
 
@@ -129,6 +136,7 @@ M6 (Deploy):           [░░░░░░░░░░]  0%   ⏳ da iniziare
 
 ## 🐛 Issue Aperte
 - **MCP filesystem**: config già aggiornata per includere `/home/death/paroleMutanti`; **serve riavvio di Cline** (o "Retry" sul banner) perché diventi effettivo.
+- **Sweeper vs pareggi automatici**: i pareggi automatici (0 socket reali) aggiornano `lastActivityAt` → una partita orfana che fa pareggi continui non viene mai ripulita dallo sweeper (richiede `socketConnessi === 0` E `etaSenzaAttivita > 2min`). Attualmente mitigato dal riavvio del server (svuota la RAM). Valutare in futuro un criterio basato sui socket senza contare i pareggi automatici come attività.
 
 ## 🚀 Pronto per M6 (Deploy)
 
