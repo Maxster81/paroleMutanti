@@ -1,12 +1,11 @@
 /**
- * views/game.js — Game view (M5 light)
+ * views/game.js — Game view (M5 full)
  *
- * Mostra: timer circle, parola corrente, input submit, history turni recenti.
- * Listener Socket: turn_update, tick, beep, mossa_rifiutata, game_over.
+ * Mostra: timer circle, parola corrente, input submit, history mosse,
+ * lista giocatori rimasti, pulsanti passa/abbandona.
+ * Mostra "Verifica in corso…" durante la validazione AI (turn_paused).
  *
- * **M5-bugfix**: mostra `currentWord` (l'ultima parola valida) invece di
- * `parolaIniziale` (la prima parola della partita), così il giocatore
- * di turno vede da quale parola partire.
+ * **M5**: feedback AI + lista giocatori + eliminazioni in tempo reale.
  *
  * @module frontend/js/views/game
  */
@@ -17,6 +16,7 @@ import { emit, on as socketOn } from '../socket.js';
 import { click as audioClick, tick as audioTick, buzzer, success, beep } from '../audio.js';
 
 let lastBeepSecond = -1;
+let verificaInCorso = false;
 
 export function renderGame(params = {}) {
   const s = state.get();
@@ -32,7 +32,6 @@ export function renderGame(params = {}) {
   }
 
   // M5-bugfix: currentWord è l'ultima parola valida, NON la iniziale
-  // La parola iniziale rimane in partita.parolaIniziale per la lobby
   const word = partita.currentWord || partita.parolaIniziale || '?';
   const giocatore = partita.giocatore || partita.giocatoreCorrente || '?';
   const timeLeft = partita.timeLeft ?? 30;
@@ -44,8 +43,14 @@ export function renderGame(params = {}) {
   const mioNome = localStorage.getItem('pm-nome') || '';
   const ioSonoTurnista = giocatore === mioNome;
 
+  // Lista giocatori rimasti (quella dal server, se presente; altrimenti da partita.giocatori)
+  const giocatoriRimasti = partita.giocatori || [];
+
   return `
-    <div class="form-view" style="text-align: center;">
+    <div class="form-view game-view" style="text-align: center;">
+      <div class="turno-counter" id="turno-counter" style="font-size: 0.95rem; font-weight: 700; color: var(--primary); margin-bottom: var(--spacing-sm); text-transform: uppercase; letter-spacing: 0.5px;">
+        TURNO ${partita.turno ?? 1} · Round ${partita.round ?? 1}/${partita.roundsTotali ?? (partita.giocatori?.length ?? 1)}
+      </div>
       <div class="timer-circle ${timerClass}" id="timer-circle">
         <div class="timer-text" id="timer-text">${timeLeft}</div>
       </div>
@@ -68,6 +73,8 @@ export function renderGame(params = {}) {
             <input class="form-input" type="text" id="input-parola" placeholder="La tua parola (a distanza 1)" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus>
           </div>
           <div id="submit-error" class="alert alert-error" style="display: none;"></div>
+          <div id="submit-info" class="alert alert-info" style="display: none;"></div>
+          <div id="verifica-box" class="alert alert-success" style="display: none;">🔎 Verifica in corso…</div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary btn-block" id="btn-submit-word">📤 Invia parola</button>
             <button type="button" class="btn btn-ghost btn-block" id="btn-pass">⏭ Passa il turno</button>
@@ -79,6 +86,17 @@ export function renderGame(params = {}) {
         </div>
         <button class="btn btn-ghost btn-block" id="btn-leave-game">🚪 Esci (abbandona)</button>
       `}
+
+      ${giocatoriRimasti.length > 0 ? `
+        <div class="card" style="margin-top: var(--spacing-md); text-align: left;">
+          <div class="text-small text-dim">Giocatori rimasti</div>
+          ${giocatoriRimasti.map(g => `
+            <div class="text-small" style="margin-top: 4px;">
+              <span class="${g === mioNome ? 'badge badge-success' : ''}">${escapeHtml(g)}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
 
       ${history.length > 0 ? `
         <div class="card" style="margin-top: var(--spacing-md); text-align: left;">
@@ -101,6 +119,8 @@ export function attachGameHandlers() {
 
   const form = document.getElementById('submit-form');
   const errorBox = document.getElementById('submit-error');
+  const infoBox = document.getElementById('submit-info');
+  const verificaBox = document.getElementById('verifica-box');
   const submitBtn = document.getElementById('btn-submit-word');
 
   if (form) {
@@ -116,6 +136,7 @@ export function attachGameHandlers() {
         return;
       }
       if (errorBox) errorBox.style.display = 'none';
+      if (infoBox) infoBox.style.display = 'none';
 
       submitBtn.disabled = true;
       submitBtn.textContent = '⏳ Invio...';
@@ -128,6 +149,8 @@ export function attachGameHandlers() {
       }, (resp) => {
         submitBtn.disabled = false;
         submitBtn.textContent = '📤 Invia parola';
+        if (verificaBox) verificaBox.style.display = 'none';
+        verificaInCorso = false;
 
         if (!resp || !resp.ok) {
           if (errorBox) {
@@ -170,6 +193,36 @@ export function attachGameHandlers() {
     }
   });
 }
+
+// Listener per la validazione AI (mostra "Verifica in corso…")
+socketOn('turn_paused', (data) => {
+  if (data.gameId === state.get().gameId) {
+    verificaInCorso = true;
+    const box = document.getElementById('verifica-box');
+    const submitBtn = document.getElementById('btn-submit-word');
+    if (box) {
+      box.textContent = '🔎 Verifica in corso…';
+      box.style.display = 'block';
+    }
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Verifica…';
+    }
+  }
+});
+
+socketOn('turn_resumed', (data) => {
+  if (data.gameId === state.get().gameId) {
+    verificaInCorso = false;
+    const box = document.getElementById('verifica-box');
+    const submitBtn = document.getElementById('btn-submit-word');
+    if (box) box.style.display = 'none';
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '📤 Invia parola';
+    }
+  }
+});
 
 function escapeHtml(s) {
   if (!s) return '';

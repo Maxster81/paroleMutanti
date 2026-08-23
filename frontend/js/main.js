@@ -21,6 +21,7 @@ import { renderCreate, attachCreateHandlers } from './views/create.js';
 import { renderJoin, attachJoinHandlers } from './views/join.js';
 import { renderLobby, attachLobbyHandlers } from './views/lobby.js';
 import { renderGame, attachGameHandlers } from './views/game.js';
+import { renderEnd, attachEndHandlers } from './views/end.js';
 
 console.log('[main] Parole Mutanti frontend avviato');
 
@@ -86,6 +87,7 @@ route('#create', renderCreate);
 route('#join', renderJoin);
 route('#lobby', renderLobby);
 route('#game', renderGame);
+route('#end', renderEnd);
 
 let currentTickSecond = -1;
 
@@ -102,6 +104,7 @@ onRouteChange((renderFn, params) => {
     case '#join': attachJoinHandlers(); break;
     case '#lobby': attachLobbyHandlers(); break;
     case '#game': attachGameHandlers(); break;
+    case '#end': attachEndHandlers(); break;
   }
 });
 
@@ -168,6 +171,42 @@ socketOn('tick', (data) => {
   }
 });
 
+// M5b: nuovo round → re-render per aggiornare giocatore corrente
+socketOn('round_start', (data) => {
+  if (data.gameId === state.get().gameId) {
+    const partita = state.get().partita || {};
+    const stato = data.stato || {};
+    state.update({
+      partita: {
+        ...partita,
+        giocatore: stato.giocatore,
+        currentWord: stato.currentWord,
+        timeLeft: stato.timeLeft,
+        round: stato.round,
+        turno: stato.turno,
+        rounds: stato.rounds,
+        giocatori: stato.giocatori || partita.giocatori,
+      }
+    });
+    currentTickSecond = -1;
+    if (location.hash.startsWith('#game')) navigate('#game');
+  }
+});
+
+// M5b: pareggio → re-render (banner + nuova parola)
+socketOn('pareggio', (data) => {
+  if (data.gameId === state.get().gameId) {
+    const partita = state.get().partita || {};
+    state.update({
+      partita: {
+        ...partita,
+        currentWord: data.parola,
+      }
+    });
+    if (location.hash.startsWith('#game')) navigate('#game');
+  }
+});
+
 socketOn('beep', () => audioTick());
 
 socketOn('mossa_rifiutata', (data) => {
@@ -187,10 +226,9 @@ socketOn('giocatore_eliminato', (data) => {
 });
 
 socketOn('game_over', (data) => {
-  state.update({ partita: { ...data, state: 'finished' } });
-  alert(`🏆 Vince: ${data.vincitore}!\n\nDurata: ${(data.durataMs / 1000).toFixed(1)}s\nTurni totali: ${data.history.length}`);
-  state.update({ gameId: null, partita: null });
-  navigate('#home');
+  // M5: naviga alla end view con i dati della partita (niente alert)
+  state.update({ partita: { ...data, state: 'finished' }, gameId: data.gameId });
+  navigate('#end');
 });
 
 socketOn('partita_cancellata', () => {

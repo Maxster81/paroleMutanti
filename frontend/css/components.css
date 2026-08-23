@@ -55,6 +55,14 @@
   color: #fff;
 }
 
+.btn-success {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+.btn-success:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--text);
