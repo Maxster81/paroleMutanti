@@ -50,10 +50,14 @@ export function connect() {
   });
 
   // Re-emit di tutti gli eventi di gioco ai listener registrati
+  // M5b-fix: round_start/pareggio/round_* erano mancanti, quindi il client
+  // non riceveva mai la nuova parola dopo un pareggio (doppio passaggio) né
+  // l'aggiornamento di turno/round → schermo "bloccato" sulla parola vecchia.
   const EVENTI = [
     'lobby_updated', 'partita_avviata', 'turn_update', 'tick', 'beep',
     'turno_scaduto', 'mossa_rifiutata', 'giocatore_eliminato',
     'game_over', 'partita_cancellata', 'turn_paused', 'turn_resumed',
+    'round_start', 'round_passato', 'round_limbo', 'pareggio', 'turno_finito',
     'errore'
   ];
   for (const ev of EVENTI) {

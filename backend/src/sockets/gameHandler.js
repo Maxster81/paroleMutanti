@@ -47,17 +47,23 @@ export function attachGameHandlers(io, socket) {
     });
 
     if (risultato.valida) {
-      const statoTurno = partita.turnManager.statoCorrente();
-      broadcastAPartita(io, gameId, 'turn_update', {
-        gameId,
-        ...statoTurno,
-        validazione: {
-          parola: risultato.normalizzata,
-          giocatore: nome,
-          source: risultato.source,
-          ai_usata: !!risultato.ai_usata,
-        },
-      });
+      // M5b-fix: turn_update solo se il turno è ancora ATTIVO (round normale
+      // in corso). Quando il round chiude il turno (attivo=false) NON emettere
+      // qui: _gestisciFineTurno è async e lo stato sarebbe "stale"; in quel
+      // caso lo stato corretto arriva da GameManager (pareggio/eliminazione).
+      if (partita.turnManager && partita.turnManager.attivo) {
+        const statoTurno = partita.turnManager.statoCorrente();
+        broadcastAPartita(io, gameId, 'turn_update', {
+          gameId,
+          ...statoTurno,
+          validazione: {
+            parola: risultato.normalizzata,
+            giocatore: nome,
+            source: risultato.source,
+            ai_usata: !!risultato.ai_usata,
+          },
+        });
+      }
 
       if (partita.state === 'finished') {
         broadcastAPartita(io, gameId, 'game_over', {
@@ -92,8 +98,12 @@ export function attachGameHandlers(io, socket) {
       return ack?.({ ok: false, errore: risultato.errore });
     }
 
+    // M5b-fix: turn_update solo se il turno è ancora ATTIVO (round normale).
+    // Quando il passaggio chiude il turno (attivo=false) NON emettere qui:
+    // _gestisciFineTurno è async e lo stato sarebbe "stale"; in quel caso lo
+    // stato corretto arriva da GameManager (pareggio/eliminazione) via turn_update.
     const partita = gameManager.getPartita(gameId);
-    if (partita && partita.turnManager) {
+    if (partita && partita.turnManager && partita.turnManager.attivo) {
       const statoTurno = partita.turnManager.statoCorrente();
       broadcastAPartita(io, gameId, 'turn_update', { gameId, ...statoTurno, passaggio: true });
     }

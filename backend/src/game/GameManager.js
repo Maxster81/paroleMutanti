@@ -276,6 +276,11 @@ export class GameManager extends EventEmitter {
       partita.turnManager.nuovoTurno(nuovaParola);
       partita.currentWord = nuovaParola;
       partita.lastActivityAt = new Date();
+      // M5b-fix: turn_update con stato CORRETTO (post-pareggio) per allineare
+      // anche i client con socket.js "vecchio" (che ascoltano solo turn_update,
+      // non round_start/pareggio). Non è "stale": nuova parola e turnista sono già
+      // state impostate da nuovoTurno().
+      this.emit('turn_update', { gameId, stato: partita.turnManager.statoCorrente() });
       return;
     }
 

@@ -77,7 +77,7 @@ export function renderGame(params = {}) {
           <div id="verifica-box" class="alert alert-success" style="display: none;">🔎 Verifica in corso…</div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary btn-block" id="btn-submit-word">📤 Invia parola</button>
-            <button type="button" class="btn btn-ghost btn-block" id="btn-pass">⏭ Passa il turno</button>
+            <button type="button" class="btn btn-ghost btn-block" id="btn-pass">⏭ Passa il round</button>
           </div>
         </form>
       ` : `
