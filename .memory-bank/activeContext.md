@@ -1,7 +1,7 @@
 # Active Context — Focus Corrente
 
 ## 🎯 Focus Corrente
-**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (desincronizzazione `3437de2`, **M5c anti-ripetizione + elenco parole**, **validazione a tre fasi DB+morfologia+AI**). **M6 Deploy in preparazione**: `VERSION` 1.0.0 attivato, `sync-to-prod.sh` + `deploy/deploy.sh` creati, `deploy/backup.sh` + cron (incluso nel deploy completo), repo pubblico `paroleMutanti_prod` popolato e pushato. Resta: deploy reale su server (Caddy TLS), test flusso 4 giocatori, refinements audio.
+**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (desincronizzazione `3437de2`, **M5c anti-ripetizione + elenco parole**, **validazione a tre fasi DB+morfologia+AI**). **M6 Deploy in preparazione**: `VERSION` 1.0.0 attivato, `sync-to-prod.sh` + `deploy/deploy.sh` creati, `deploy/backup.sh` + cron (incluso nel deploy completo), repo pubblico `paroleMutanti_prod` popolato e pushato. **Rifiniture post-M5 fatte**: audio migliorato (envelope, arpeggio, buzzer) + test E2E multi-context a 4 giocatori verificato (stessa parola per tutti). Resta: deploy reale su server (Caddy TLS).
 
 ## ✅ Cosa è stato fatto (riepilogo cronologico)
 

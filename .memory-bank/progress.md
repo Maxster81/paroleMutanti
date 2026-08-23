@@ -121,8 +121,8 @@
 - [ ] Deploy reale su server (Caddy TLS, DNS, test produzione)
 
 ### Post-M5 (opzionali / rifiniture)
-- [ ] Test Playwright multi-context per flusso 4 giocatori (per evitare il localStorage condiviso tra tab)
-- [ ] Rifiniture audio se richieste
+- [x] Test Playwright multi-context a 4 giocatori: 4 contesti isolati (Alice/Bob/Carlo/Diana) → stessa parola per tutti, ognuno vede i 4 giocatori, nessun conflitto localStorage
+- [x] Rifiniture audio: envelope anti-click, `success()` come arpeggio di Do maggiore, `buzzer()` a due toni, `tick()`/`click()` con forme d'onda dedicate
 
 ## 📈 Metriche di Avanzamento
 ```
