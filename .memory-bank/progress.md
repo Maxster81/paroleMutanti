@@ -121,6 +121,7 @@
 - [x] `deploy/backup.sh` (pg_dump + gzip + rotazione 7) + cron automatico installato da `deploy.sh` nel deploy completo (ogni notte alle 3:00)
 - [x] `deploy/README.md` (guida passo-passo primo deploy + architettura + aggiornamenti + backup)
 - [x] Home: "📖 Come si gioca" aggiornata (3 fasi, non ripetere parole, pareggio) e resa sezione apribile (accordion con freccina ▸, `aria-expanded`, chiusa di default)
+- [x] Fix deploy.sh: DB setup spostato in un passo `--db` DOPO `--env` (DATABASE_URL prima generata automaticamente); password DB generata nel shell e passata a setup-user.sql via `-v db_password` (psql \if/\set); niente più copia manuale password
 - [ ] Deploy reale su server (Caddy TLS, DNS, test produzione)
 
 ### Post-M5 (opzionali / rifiniture)
