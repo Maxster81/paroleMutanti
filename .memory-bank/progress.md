@@ -1,5 +1,17 @@
 # Progress — Stato Avanzamento
 
+## 🕘 Storico Milestone (sunto)
+
+| Milestone | Esito | Nota breve |
+|---|---|---|
+| M1 — Setup & DB | ✅ | PostgreSQL 16, dizionario, script DB, file deploy |
+| M2 — Backend Core | ✅ | Express + Socket.io, health check, 28/28 test |
+| M3 — AI Integration | ✅ | DeepSeek, cache + rate limit, Validator 4-step |
+| M4b — Dizionario Ibrido | ✅ | LO + HF, 185.723 parole, script import/update |
+| M4 — Frontend Base | ✅ | SPA + CSS + JS, views home/create/join/lobby/game/end |
+| M5 — Gioco Realtime | ✅ | game view, end view, home lista, modello round/turno/limbo + bugfix |
+| M6 — Deploy | ⏳ | da validare Caddy/systemd, backup, TLS |
+
 ## 📊 Overall Status
 - **Milestone 1 (Setup & DB)**: ✅ **COMPLETATA**
 - **Milestone 2 (Backend Core)**: ✅ **COMPLETATA**
