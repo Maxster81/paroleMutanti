@@ -151,6 +151,10 @@
 - [x] `deploy.sh`: nuova funzione `do_schema()` (db:init idempotente con DATABASE_URL da env). Usata in `--db` (nuova installazione) e in `--update` (crea tabelle mancanti, es. `feedback`, senza toccare i dati)
 - [x] `deploy/README.md` e header `deploy.sh` aggiornati (--update ora applica lo schema)
 
+### Deploy: permessi env + do_schema rigoroso (1.3.7)
+- [x] `do_env`: ripristina sempre `chown parole-mutanti` + `chmod 600` anche quando il file `.env` esiste già (evita che manualità/deploy lascino il file a root)
+- [x] `do_schema`: ora `exit 1` con errore chiaro se manca `ENV_FILE`/`DATABASE_URL` (prima era un `return` silenzioso che faceva "riuscire" `--update` senza applicare lo schema); aggiunto `[schema] FATTO`
+
 ## 📈 Metriche di Avanzamento
 ```
 M1 (Setup & DB):       [██████████] 100%  ✅ COMPLETATA
