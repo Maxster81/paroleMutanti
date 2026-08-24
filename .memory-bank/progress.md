@@ -136,6 +136,9 @@
 - [x] Fix 8.E: `.env.example` documenta `DB_POOL_MAX`, `DEEPSEEK_ENABLED`, `CORS_ORIGIN`
 - [x] Fix 8.F: `progress.md` allineato allo stato reale (M6 completato/live)
 
+### Feedback (1.3.4)
+- [x] Home: link "💬 Invia un feedback" → `mailto:bartosh1981@outlook.it?subject=Feedback%20ParoleMutanti` (stile touch-friendly `.home-feedback`). In futuro diventerà un form con invio email (vedi nota soluzioni).
+
 ## 📈 Metriche di Avanzamento
 ```
 M1 (Setup & DB):       [██████████] 100%  ✅ COMPLETATA
