@@ -10,6 +10,8 @@
 - La modalità `--update` di `deploy/deploy.sh` è stata **CORRETTA** (commit `dd3f042`): ora fa `git pull` nel clone + rsync + npm + restart. Il bug era che faceva `git pull` in `$DEPLOY_DIR` (`/opt/paroleMutanti`) che non ha `.git`. Sul server: `cd /tmp/paroleMutanti_prod && sudo ./deploy/deploy.sh --update`.
 - Sul server il clone sorgente è in `/tmp/paroleMutanti_prod`, il runtime in `/opt/paroleMutanti`.
 
+**🔧 Fix riconnessione socket (standby telefono)**: dopo uno standby il WebSocket cade e si riconnette con un nuovo socket.id, ma il client NON ri-sincronizzava lo stato → partita desincronizzata (click senza effetto, parole scartate, UI stantia). Causa: mancava una ri-sincronizzazione alla riconnessione. Fix (commit dev `83419ec`): in `socket.js` flag `hadConnection` per distinguere la prima connessione dalle riconnessioni; `main.js` alla riconnessione emette `request_state` (ri-registra il socket + riallinea la UI). Decisione utente: NESSUNA pausa del timer in standby (chi va in standby perde il turno), ma al riconnettersi in tempo vede tutto aggiornato.
+
 **✅ Caddy risolto**: `/var/log/caddy/parole-mutanti.log` era `root:root 600` (creato da deploy vecchio) → reload Caddy falliva con `permission denied`. Fix: rieseguire `sudo ./deploy/deploy.sh --caddy --domain parolemutanti.maxster.top --port 8090` (do_caddy fa `chown caddy:caddy` + `chmod 644`), poi `systemctl restart caddy`. Sito `https://parolemutanti.maxster.top/health` → 200 via Caddy→Express. Nota: `--install` NON tocca Caddy; dopo un sync di `deploy.sh` va rieseguito `--caddy`. Sul server gira anche un'altra app (efftrack) sulla stessa istanza Caddy.
 
 ## ✅ Cosa è stato fatto (riepilogo cronologico)
