@@ -10,7 +10,7 @@
 | M4b — Dizionario Ibrido | ✅ | LO + HF, 185.723 parole, script import/update |
 | M4 — Frontend Base | ✅ | SPA + CSS + JS, views home/create/join/lobby/game/end |
 | M5 — Gioco Realtime | ✅ | game view, end view, home lista, modello round/turno/limbo + bugfix |
-| M6 — Deploy | ⏳ | da validare Caddy/systemd, backup, TLS |
+| M6 — Deploy | ✅ | live in produzione (1.2.9+), Caddy TLS, systemd, backup, test 08 |
 
 ## 📊 Overall Status
 - **Milestone 1 (Setup & DB)**: ✅ **COMPLETATA**
@@ -19,7 +19,7 @@
 - **Milestone 4b (Dizionario Ibrido)**: ✅ **COMPLETATA**
 - **Milestone 4 (Frontend Base)**: ✅ **COMPLETATA** (home, crea, unisciti, lobby, game, end)
 - **Milestone 5 (Gioco Realtime)**: ✅ **COMPLETATA** (game view rifinita, end view, home lista auto-aggiornata, animazioni CSS, feedback AI)
-- **Milestone 6 (Deploy)**: ⏳ **NON INIZIATA** (file predisposti, da validare)
+- **Milestone 6 (Deploy)**: ✅ **COMPLETATA** (live su `parolemutanti.maxster.top`, Caddy TLS + systemd + backup; aggiornamenti in-place via `deploy.sh --update` fino a 1.3.3)
 
 ## ✅ Cosa Funziona (Done)
 
@@ -122,11 +122,19 @@
 - [x] `deploy/README.md` (guida passo-passo primo deploy + architettura + aggiornamenti + backup)
 - [x] Home: "📖 Come si gioca" aggiornata (3 fasi, non ripetere parole, pareggio) e resa sezione apribile (accordion con freccina ▸, `aria-expanded`, chiusa di default)
 - [x] Fix deploy.sh: DB setup spostato in un passo `--db` DOPO `--env` (DATABASE_URL prima generata automaticamente); password DB generata nel shell e passata a setup-user.sql via `-v db_password` (psql \if/\set); niente più copia manuale password
-- [ ] Deploy reale su server (Caddy TLS, DNS, test produzione)
+- [x] Deploy reale su server (Caddy TLS, DNS, test produzione) — live dal 1.2.9, aggiornato fino a 1.3.3
 
 ### Post-M5 (opzionali / rifiniture)
 - [x] Test Playwright multi-context a 4 giocatori: 4 contesti isolati (Alice/Bob/Carlo/Diana) → stessa parola per tutti, ognuno vede i 4 giocatori, nessun conflitto localStorage
 - [x] Rifiniture audio: envelope anti-click, `success()` come arpeggio di Do maggiore, `buzzer()` a due toni, `tick()`/`click()` con forme d'onda dedicate
+
+### Audit regola 08 (1.3.3)
+- [x] Fix 8.A: CORS default ristretto in produzione (`CORS_ORIGIN`); validazioni server-side `gamesToWin`/`initialLength` (creaPartita) e `ready` booleano (setReady); `data-game-id` escapato in home.js
+- [x] Fix 8.B: `broadcastAPartita` ora usa le room (`lobby:`/`game:`) al posto dell'iterazione della mappa (O(1))
+- [x] Fix 8.C: parole complete rimosse dai log (`mossa_rifiutata`, `parola_iniziale_scelta`, `parola_accettata_morfologia`); log uniformati JSON in `pool.js`/`config.js`
+- [x] Fix 8.D: aggiunto test di integrazione `backend/tests/gameManager.test.js` (ciclo vita: crea/validazioni/avvio/pareggio/abbandono) + test e2e socket `backend/tests/e2e-socket.test.js` (flusso crea→join→ready→avvio→game_over)
+- [x] Fix 8.E: `.env.example` documenta `DB_POOL_MAX`, `DEEPSEEK_ENABLED`, `CORS_ORIGIN`
+- [x] Fix 8.F: `progress.md` allineato allo stato reale (M6 completato/live)
 
 ## 📈 Metriche di Avanzamento
 ```
@@ -136,7 +144,7 @@ M3 (AI Integration):   [██████████] 100%  ✅ COMPLETATA
 M4b (Dizionario):      [██████████] 100%  ✅ COMPLETATA
 M4 (Frontend Base):    [██████████] 100%  ✅ COMPLETATA
 M5 (Gioco Realtime):   [██████████] 100%  ✅ COMPLETATA
-M6 (Deploy):           [░░░░░░░░░░]  0%   ⏳ da iniziare
+M6 (Deploy):           [██████████] 100%  ✅ COMPLETATA (live 1.2.9+)
 ```
 
 ## 🏆 Risultati per Milestone

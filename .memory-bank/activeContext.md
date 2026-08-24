@@ -1,7 +1,7 @@
 # Active Context — Focus Corrente
 
 ## 🎯 Focus Corrente
-**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (desincronizzazione `3437de2`, **M5c anti-ripetizione + elenco parole**, **validazione a tre fasi DB+morfologia+AI**). **M6 Deploy in preparazione**: `VERSION` 1.0.0 attivato, `sync-to-prod.sh` + `deploy/deploy.sh` creati, `deploy/backup.sh` + cron (incluso nel deploy completo), repo pubblico `paroleMutanti_prod` popolato e pushato. **Rifiniture post-M5 fatte**: audio migliorato (envelope, arpeggio, buzzer) + test E2E multi-context a 4 giocatori verificato (stessa parola per tutti). Resta: deploy reale su server (Caddy TLS).
+**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (desincronizzazione `3437de2`, **M5c anti-ripetizione + elenco parole**, **validazione a tre fasi DB+morfologia+AI**). **M6 Deploy completato e live** (`parolemutanti.maxster.top`). **Audit regola 08 eseguito (1.3.3)**: fix CORS prod, validazioni server-side mancanti, parole rimosse dai log, `broadcastAPartita` su room, `.env.example` completato; aggiunti **test di integrazione GameManager** e **test e2e socket**.
 
 **🔧 Fix critico (deploy)**: risolto il bug che bloccava l'avvio in produzione — `SESSION_SECRET < 32` era un **path-mismatch** in `backend/src/config.js` riga 52 (`cfg.sessionSecret` invece di `cfg.security.sessionSecret`). Causa: `validaConfig` leggeva dal livello sbagliato → errore SEMPRE in produzione. Fix: riga 52 → `cfg.security.sessionSecret`. Commit dev `bfecf46`, prod `6e6da3c` (sync + push fatti). **✅ Deploy riuscito**: server `/health` risponde `{"status":"ok","version":"1.2.9","database":"ok","env":"production"}` — app online, restart loop risolto.
 
