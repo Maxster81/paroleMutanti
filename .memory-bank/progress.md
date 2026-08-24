@@ -147,6 +147,10 @@
 - [x] Home: link feedback ora apre `#feedback` (form) al posto del mailto
 - [x] Test unit `backend/tests/telegram.test.js` (formatter messaggio)
 
+### Deploy: schema idempotente in --update (1.3.6)
+- [x] `deploy.sh`: nuova funzione `do_schema()` (db:init idempotente con DATABASE_URL da env). Usata in `--db` (nuova installazione) e in `--update` (crea tabelle mancanti, es. `feedback`, senza toccare i dati)
+- [x] `deploy/README.md` e header `deploy.sh` aggiornati (--update ora applica lo schema)
+
 ## 📈 Metriche di Avanzamento
 ```
 M1 (Setup & DB):       [██████████] 100%  ✅ COMPLETATA
