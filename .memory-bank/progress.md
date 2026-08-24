@@ -165,6 +165,10 @@
 - [x] Fix: `_gestisciFineTurno` NON aggiorna più `lastActivityAt` nei percorsi automatici (pareggio e prosecuzione con ultima parola valida). `lastActivityAt` resta aggiornato solo dalle attività reali (submit valido, join, ready, avvio, abbandono)
 - [x] Risultato: una partita orfana a 0 socket bloccata su pareggi infiniti ha `lastActivityAt` stantio → lo sweeper la cancella dopo 2 min. Test aggiunti: pareggio non tocca lastActivityAt + sweeper running a 0 socket → cancelled. Rimosso dalla Issue Aperte
 
+### Frontend: toggle suono/tema aggiornano subito icona e badge (1.3.11)
+- [x] Bug: `toggleSound()`/`toggleTheme()` aggiornavano lo state ma `refreshSoundIcon()`/`refreshThemeIcon()` erano chiamati solo all'avvio e al cambio rotta → icona header e badge home "audio on/off" restavano stantii (il suono però si togglava).
+- [x] Fix: aggiunto `state.subscribe` in `main.js` che aggiorna icona header (suono+tema+status dot) e i badge della home (con `id` dedicati `stato-connessione`/`stato-tema`/`stato-audio` in `home.js`). Verificato con Playwright (icona 🔊/🔇, badge on/off, tema ☀️/🌙).
+
 ## 📈 Metriche di Avanzamento
 ```
 M1 (Setup & DB):       [██████████] 100%  ✅ COMPLETATA
