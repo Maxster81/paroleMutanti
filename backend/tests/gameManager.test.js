@@ -156,6 +156,7 @@ test('doppio passaggio di turno → pareggio, tutti restano in gioco (DB)', asyn
   if (!dbDisponibile) return t.skip('DB non disponibile');
   const { gid, partita } = await creaPartitaAvviata();
   const tm = partita.turnManager;
+  const lastActivityPrima = partita.lastActivityAt;
   // Round 1: Alice passa (limbo)
   assert.equal(tm.giocatoreCorrente(), 'Alice');
   assert.equal(gameManager.passaTurno(gid, 'Alice').ok, true);
@@ -173,5 +174,21 @@ test('doppio passaggio di turno → pareggio, tutti restano in gioco (DB)', asyn
   assert.equal(dopo.giocatori.length, 2);
   assert.equal(dopo.turnManager.turno, 2);
   assert.equal(dopo.turnManager.attivo, true);
+  // Il pareggio automatico (0 azioni reali) NON deve aggiornare lastActivityAt,
+  // altrimenti lo sweeper non ripulisce mai una partita orfana bloccata.
+  assert.equal(dopo.lastActivityAt, lastActivityPrima, 'il pareggio non deve aggiornare lastActivityAt');
+});
+
+test('sweeper: running con 0 socket e attività stantia → cancellata', async (t) => {
+  if (!dbDisponibile) return t.skip('DB non disponibile');
+  const { gid } = await creaPartitaAvviata();
+  const p = gameManager.getPartita(gid);
+  // Simula partita orfana a 0 socket (nessun socket registrato → contaSocket=0)
+  // con ultima attività reale >2min fa (TIMEOUT_RUNNING_SOLO_MS = 2 min).
+  p.lastActivityAt = new Date(Date.now() - 3 * 60 * 1000);
+  gameManager._sweepAbbandonate();
+  const dopo = gameManager.getPartita(gid);
+  assert.ok(dopo, 'la partita deve esistere ancora (cancellata, non ancora rimossa)');
+  assert.equal(dopo.state, 'cancelled');
 });
 

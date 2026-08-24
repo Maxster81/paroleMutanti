@@ -161,6 +161,10 @@
 ### Deploy: --update auto-re-exec (1.3.9)
 - [x] Fix footgun "git pull dentro lo script in esecuzione": `do_update` ora al primo giro fa `git pull --ff-only` e poi **si ri-esegue con `exec "$0" --update`** (guardato da `PAROLE_REEXECED`), così carica sempre l'ULTIMA versione dello script senza doppie esecuzioni manuali
 
+### Sweeper: pareggi automatici non contano come attività (1.3.10)
+- [x] Fix: `_gestisciFineTurno` NON aggiorna più `lastActivityAt` nei percorsi automatici (pareggio e prosecuzione con ultima parola valida). `lastActivityAt` resta aggiornato solo dalle attività reali (submit valido, join, ready, avvio, abbandono)
+- [x] Risultato: una partita orfana a 0 socket bloccata su pareggi infiniti ha `lastActivityAt` stantio → lo sweeper la cancella dopo 2 min. Test aggiunti: pareggio non tocca lastActivityAt + sweeper running a 0 socket → cancelled. Rimosso dalla Issue Aperte
+
 ## 📈 Metriche di Avanzamento
 ```
 M1 (Setup & DB):       [██████████] 100%  ✅ COMPLETATA
@@ -185,7 +189,6 @@ M6 (Deploy):           [██████████] 100%  ✅ COMPLETATA (li
 
 ## 🐛 Issue Aperte
 - **MCP filesystem**: config già aggiornata per includere `/home/death/paroleMutanti`; **serve riavvio di Cline** (o "Retry" sul banner) perché diventi effettivo.
-- **Sweeper vs pareggi automatici**: i pareggi automatici (0 socket reali) aggiornano `lastActivityAt` → una partita orfana che fa pareggi continui non viene mai ripulita dallo sweeper (richiede `socketConnessi === 0` E `etaSenzaAttivita > 2min`). Attualmente mitigato dal riavvio del server (svuota la RAM). Valutare in futuro un criterio basato sui socket senza contare i pareggi automatici come attività.
 
 ## 🚀 Pronto per M6 (Deploy)
 

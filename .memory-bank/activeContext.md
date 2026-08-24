@@ -101,7 +101,7 @@
 - **Fix 3**: `GameManager.js` nel caso pareggio emette un `turn_update` con stato CORRETTO (post-`nuovoTurno`) per allineare anche i client che ascoltano solo `turn_update`.
 - **UX**: `views/game.js` rinomina il pulsante "⏭ Passa il turno" → "⏭ Passa il round".
 - **Verifica**: E2E node (sync-test) Alice/Bob stessa parola+turnista per 27 turni di pareggi → ALLINEATO ✅; browser reale Mario+Bob timeout automatico → `TURNO 1 → TURNO 4 · Round 1/2`, parola `cerei → vinile`, turnista corretto, form attivo solo a chi tocca, "Passa il round". Console 0 errori.
-- **⚠️ Nota sweeper**: i pareggi automatici aggiornano `lastActivityAt` → una partita orfana che fa pareggi continui (0 socket reali) non viene mai ripulita dallo sweeper (richiede `socketConnessi === 0` E `etaSenzaAttivita > 2min`). Attualmente mitigato dal riavvio del server (svuota la RAM). Valutare in futuro un criterio basato sui socket senza contare i pareggi automatici come attività.
+- **✅ Fix sweeper (1.3.10)**: i pareggi automatici NON aggiornano più `lastActivityAt` (solo attività reali: submit valido, join, ready, avvio, abbandono). Una partita orfana a 0 socket bloccata su pareggi infiniti ora ha `lastActivityAt` stantio → lo sweeper la cancella dopo 2 min.
 
 ### M5c — Regola anti-ripetizione + elenco "Parole già scritte" (✅)
 - **Regola nuova**: un giocatore NON può riscrivere una parola già usata nella stessa partita (evita i loop `ARIDO → ARIDI → ARIDO`).
