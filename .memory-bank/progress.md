@@ -155,6 +155,9 @@
 - [x] `do_env`: ripristina sempre `chown parole-mutanti` + `chmod 600` anche quando il file `.env` esiste già (evita che manualità/deploy lascino il file a root)
 - [x] `do_schema`: ora `exit 1` con errore chiaro se manca `ENV_FILE`/`DATABASE_URL` (prima era un `return` silenzioso che faceva "riuscire" `--update` senza applicare lo schema); aggiunto `[schema] FATTO`
 
+### Deploy: do_schema usa source dell'env (1.3.8)
+- [x] Fix bug produzione: `do_schema` estraeva `DATABASE_URL` con `grep|cut`, che alterava l'URL se la password contiene caratteri speciali → `password authentication failed for user "paole_use"` (username troncato). Ora **sorgo l'intero file env** (`set -a; . "$ENV_FILE"; set +a`), stessa modalità del servizio in ExecStart (e del comando manuale che funzionava)
+
 ## 📈 Metriche di Avanzamento
 ```
 M1 (Setup & DB):       [██████████] 100%  ✅ COMPLETATA
