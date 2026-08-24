@@ -10,6 +10,8 @@
 - La modalità `--update` di `deploy/deploy.sh` è **ROTTA**: fa `git pull` dentro `$DEPLOY_DIR` (`/opt/paroleMutanti`) che **non ha `.git`** (è copiato via rsync). Usare invece: `git pull` nel clone + `sudo ./deploy/deploy.sh --install` + `systemctl restart parole-mutanti`.
 - Sul server il clone sorgente è in `/tmp/paroleMutanti_prod`, il runtime in `/opt/paroleMutanti`.
 
+**✅ Caddy risolto**: `/var/log/caddy/parole-mutanti.log` era `root:root 600` (creato da deploy vecchio) → reload Caddy falliva con `permission denied`. Fix: rieseguire `sudo ./deploy/deploy.sh --caddy --domain parolemutanti.maxster.top --port 8090` (do_caddy fa `chown caddy:caddy` + `chmod 644`), poi `systemctl restart caddy`. Sito `https://parolemutanti.maxster.top/health` → 200 via Caddy→Express. Nota: `--install` NON tocca Caddy; dopo un sync di `deploy.sh` va rieseguito `--caddy`. Sul server gira anche un'altra app (efftrack) sulla stessa istanza Caddy.
+
 ## ✅ Cosa è stato fatto (riepilogo cronologico)
 
 ### M1 — Setup & DB ✅
