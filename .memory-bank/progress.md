@@ -139,6 +139,14 @@
 ### Feedback (1.3.4)
 - [x] Home: link "💬 Invia un feedback" → `mailto:bartosh1981@outlook.it?subject=Feedback%20ParoleMutanti` (stile touch-friendly `.home-feedback`). In futuro diventerà un form con invio email (vedi nota soluzioni).
 
+### Feedback form + Telegram (1.3.5)
+- [x] View `#feedback` (Tipo: suggerimento/problema/altro + sottocategoria dinamica, mobile-first) → `POST /api/feedback`
+- [x] Endpoint `POST /api/feedback` (Express): validazione server-side + rate limit 3/min/IP, salva in tabella `feedback` (PostgreSQL), inoltra (opzionale) a un bot Telegram
+- [x] Tabella `feedback` in `init-db.sql` (id, tipo, sottocategoria, testo, nome, created_at)
+- [x] Modulo `backend/src/telegram/telegramClient.js` (fetch nativo, `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` da env, testabile) + `backend/src/db/feedbackQueries.js`
+- [x] Home: link feedback ora apre `#feedback` (form) al posto del mailto
+- [x] Test unit `backend/tests/telegram.test.js` (formatter messaggio)
+
 ## 📈 Metriche di Avanzamento
 ```
 M1 (Setup & DB):       [██████████] 100%  ✅ COMPLETATA

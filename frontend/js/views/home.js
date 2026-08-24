@@ -62,7 +62,7 @@ export function renderHome(params = {}) {
         · audio <span class="badge ${s.audioAbilitato ? 'badge-success' : 'badge-muted'}">${s.audioAbilitato ? 'on' : 'off'}</span>
       </p>
 
-      <a class="home-feedback" href="mailto:bartosh1981@outlook.it?subject=Feedback%20ParoleMutanti" rel="noopener">
+      <a class="home-feedback" href="#feedback">
         💬 Invia un feedback
       </a>
     </div>
