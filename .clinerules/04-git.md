@@ -1,15 +1,27 @@
 # 04 — Git & Version Control Rules
 
-## Modello a Repository Singolo
+## Modello a Due Repository (Dev + Prod)
 
-Il progetto usa **un solo repository Git**:
+Il progetto usa **due repository Git separati** (workflow tipo efftrack):
 
 | Repository | Ruolo | Visibilità | Branch principale |
 |---|---|---|---|
-| `paroleMutanti` | Dev + Prod (stesso repo) | Privato | `main` |
+| `paroleMutanti` | Sviluppo | Privato | `main` |
+| `paroleMutanti_prod` | Produzione (deploy) | Pubblico | `main` |
 
-- Lo sviluppo e il deploy condividono lo stesso repo.
-- La produzione fa `git pull` direttamente (vedi `deploy/` per systemd/Caddy).
+### Flusso di sync dev → prod
+1. Su **dev** si lavora su `main` (o branch feature/fix temporanei, poi distrutti): commit, test, debug.
+2. Quando si è a buon punto, **SOLO su richiesta esplicita dell'utente**, si esegue `./sync-to-prod.sh` (dalla root di dev):
+   - Copia SOLO i file di produzione (whitelist rsync; esclude `.clinerules`, `.memory-bank`, test, file personali).
+   - Traccia l'ultimo commit sincronizzato in `.last-sync-dev-commit` (non committato).
+   - Genera il messaggio di commit composito in `/tmp/parole-sync-msg.txt` (elenca i commit di dev).
+3. Nel repo `paroleMutanti_prod` si committa con `git commit -F /tmp/parole-sync-msg.txt` e si pusha.
+4. **Produzione** (server Ubuntu) fa `git pull` dal repo pubblico `paroleMutanti_prod` e rilancia con `deploy/deploy.sh`.
+
+### Regole operative
+- **MAI** fare sync dev→prod in autonomia: sempre su richiesta esplicita dell'utente.
+- La sync è una whitelist di file: se si aggiunge una cartella root di produzione, aggiungere una riga `--include='cartella/'` e `--include='cartella/***'` in `sync-to-prod.sh`.
+- Commit su dev con Conventional Commits in italiano (vedi sotto).
 
 ## Branching
 
