@@ -158,6 +158,9 @@
 ### Deploy: do_schema usa source dell'env (1.3.8)
 - [x] Fix bug produzione: `do_schema` estraeva `DATABASE_URL` con `grep|cut`, che alterava l'URL se la password contiene caratteri speciali → `password authentication failed for user "paole_use"` (username troncato). Ora **sorgo l'intero file env** (`set -a; . "$ENV_FILE"; set +a`), stessa modalità del servizio in ExecStart (e del comando manuale che funzionava)
 
+### Deploy: --update auto-re-exec (1.3.9)
+- [x] Fix footgun "git pull dentro lo script in esecuzione": `do_update` ora al primo giro fa `git pull --ff-only` e poi **si ri-esegue con `exec "$0" --update`** (guardato da `PAROLE_REEXECED`), così carica sempre l'ULTIMA versione dello script senza doppie esecuzioni manuali
+
 ## 📈 Metriche di Avanzamento
 ```
 M1 (Setup & DB):       [██████████] 100%  ✅ COMPLETATA
