@@ -51,6 +51,7 @@ export class GameManager extends EventEmitter {
       gamesToWin = config.game.defaultGamesToWin,
       initialLengthMin = config.game.initialWordMinLength,
       initialLengthMax = config.game.initialWordMaxLength,
+      pubblico = config.game.defaultPublic,
     } = opzioni;
 
     if (!creator || typeof creator !== 'string' || creator.trim().length < 1) {
@@ -70,6 +71,9 @@ export class GameManager extends EventEmitter {
     if (initialLengthMin < 3 || initialLengthMax > 10 || initialLengthMin > initialLengthMax) {
       return { ok: false, errore: 'initial_length_non_valido' };
     }
+    if (typeof pubblico !== 'boolean') {
+      return { ok: false, errore: 'pubblico_non_valido' };
+    }
 
     const nome = creator.trim();
     for (const p of this.matches.values()) {
@@ -85,6 +89,7 @@ export class GameManager extends EventEmitter {
       giocatori: [nome],
       ready: [false],
       state: 'waiting',
+      pubblico,                           // pubblica = visibile in home; privata = solo via codice
       params: { max_players: maxPlayers, turn_seconds: turnSeconds, games_to_win: gamesToWin, initial_length_min: initialLengthMin, initial_length_max: initialLengthMax },
       gamesToWin,                          // best-of-N (ora effettivo)
       mancheCorrente: 1,                   // numero manche in corso
@@ -262,8 +267,18 @@ export class GameManager extends EventEmitter {
 
   getMatch(gameId) { return this.matches.get(gameId); }
 
-  listaMatchAperti() {
-    return Array.from(this.matches.values()).filter((p) => p.state === 'waiting');
+  /**
+   * Elenca le partite in attesa. Con `soloPubblico=true` restituisce SOLO le
+   * pubbliche (quelle visibili in home); le private restano raggiungibili solo
+   * via codice (join_game).
+   *
+   * @param {boolean} [soloPubblico=false]
+   * @returns {object[]}
+   */
+  listaMatchAperti(soloPubblico = false) {
+    return Array.from(this.matches.values())
+      .filter((p) => p.state === 'waiting')
+      .filter((p) => !soloPubblico || p.pubblico === true);
   }
 
   size() { return this.matches.size; }

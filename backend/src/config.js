@@ -118,6 +118,9 @@ export const config = (() => {
       // al termine i non-pronti vengono espulsi e i pronti entrano in partita.
       // Configurabile SOLO via env (NON nella UI). Sotto 10s è troppo rapido, sopra 120s inutile.
       lobbyTimerSeconds: toInt(process.env.LOBBY_TIMER_SECONDS, 30, 10, 120),
+      // Default di visibilità di una nuova partita: pubblica (visibile in home).
+      // L'utente può scegliere "privata" al momento della creazione (flag solo alla creazione).
+      defaultPublic: toBool(process.env.DEFAULT_PUBLIC ?? 'true'),
     },
 
     // Sicurezza

@@ -84,6 +84,8 @@ function partitaPerLobby(p) {
     lobbyTimerAttivo: !!p.lobbyTimer,
     lobbyTimerTimeLeft: p.lobbyTimer?.timeLeft ?? null,
     lobbyTimerTot: p.lobbyTimer?.tot ?? p.lobbyTimerSecondi ?? 30,
+    // Visibilità: pubblica (in home) o privata (solo via codice)
+    pubblico: p.pubblico !== false,
   };
 }
 
@@ -97,7 +99,7 @@ export function attachLobbyHandlers(io, socket) {
       return ack?.({ ok: false, errore: 'rate_limit', messaggio: 'Troppe richieste, riprova tra poco.' });
     }
 
-    const { nome, maxPlayers, turnSeconds, gamesToWin, initialLengthMin, initialLengthMax } = payload || {};
+    const { nome, maxPlayers, turnSeconds, gamesToWin, initialLengthMin, initialLengthMax, pubblico } = payload || {};
 
     const risultato = await gameManager.creaMatch({
       creator: nome,
@@ -106,6 +108,7 @@ export function attachLobbyHandlers(io, socket) {
       gamesToWin,
       initialLengthMin,
       initialLengthMax,
+      pubblico,
     });
 
     if (!risultato.ok) {
@@ -241,7 +244,9 @@ export function attachLobbyHandlers(io, socket) {
 
   // list_games
   socket.on('list_games', (payload, ack) => {
-    const partite = gameManager.listaMatchAperti().map(partitaPerLobby);
+    // In home mostriamo SOLO le partite pubbliche; le private si raggiungono
+    // esclusivamente via codice (join_game).
+    const partite = gameManager.listaMatchAperti(true).map(partitaPerLobby);
     ack?.({ ok: true, partite });
   });
 

@@ -14,6 +14,8 @@ Mobile-first, vanilla JS, Node.js + Express + Socket.io + PostgreSQL + DeepSeek 
 ## 🎯 Regole del gioco
 
 - 2-8 giocatori per partita, nessun account (solo nome di sessione)
+- Ogni partita è **pubblica** (visibile in home) o **privata** (solo via codice): decisa alla creazione.
+  In home compaiono solo le partite **pubbliche**; il default è `DEFAULT_PUBLIC` (true)
 - Il server genera una parola iniziale (5-8 lettere, configurabile)
 - A ogni **mano** il giocatore modifica la parola precedente con UNA sola mossa:
   - Cambiare 1 lettera (es. `BANANA` → `BANANE`)

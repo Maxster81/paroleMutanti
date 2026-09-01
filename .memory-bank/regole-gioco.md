@@ -44,6 +44,10 @@ l'inglese standard per i concetti nuovi.
   `waiting` impedisce di crearne/entrarne in un'altra.
 - **Parola iniziale**: scelta casualmente dal dizionario, con lunghezza random nell'intervallo configurato
   (default 5–8), pesata sulla disponibilità (`WordPicker.scegliParolaIniziale`).
+- **Visibilità**: ogni partita è **pubblica** (visibile nella lista della home) o **privata**
+  (solo via codice). Decisa al momento della creazione (`pubblico`, default `true`, configurabile
+  via `DEFAULT_PUBLIC`). La lista in home mostra **solo le pubbliche**; le private si raggiungono
+  esclusivamente con il codice (`join_game`).
 - **Stati partita**: `waiting` → `running` → `finished` (oppure `cancelled`).
 
 ---

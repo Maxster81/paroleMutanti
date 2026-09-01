@@ -121,6 +121,24 @@ test('setReady: ready non booleano → rifiutato (F4)', async () => {
   assert.equal(r.errore, 'ready_non_valido');
 });
 
+test('creaMatch: pubblico default true; privata se false; listaMatchAperti(true) filtra', async () => {
+  const pub = await gameManager.creaMatch({ creator: 'Pippo' });
+  assert.equal(pub.ok, true);
+  assert.equal(pub.match.pubblico, true);
+  const priv = await gameManager.creaMatch({ creator: 'Ciccio', pubblico: false });
+  assert.equal(priv.ok, true);
+  assert.equal(priv.match.pubblico, false);
+  const soloPubbliche = gameManager.listaMatchAperti(true).map((m) => m.id);
+  assert.ok(soloPubbliche.includes(pub.match.id), 'pubblica deve comparire in home');
+  assert.ok(!soloPubbliche.includes(priv.match.id), 'privata NON deve comparire in home');
+});
+
+test('creaMatch: pubblico non booleano → rifiutato', async () => {
+  const r = await gameManager.creaMatch({ creator: 'Alice', pubblico: 'si' });
+  assert.equal(r.ok, false);
+  assert.equal(r.errore, 'pubblico_non_valido');
+});
+
 // ============================================================
 // Ciclo di vita (richiede DB per la parola iniziale)
 // ============================================================
