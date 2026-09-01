@@ -243,6 +243,70 @@ test('abbandono a 3 giocatori (non di turno) → non salta il turnista, si prose
   assert.equal(partita.turnManager.giocatoreCorrente(), 'Alice', 'il turnista non deve cambiare');
 });
 
+test('timer lobby: 3 giocatori, 2 pronti ma non tutti → parte il countdown (DB)', async (t) => {
+  if (!dbDisponibile) return t.skip('DB non disponibile');
+  const c = await gameManager.creaMatch({ creator: 'Alice' });
+  const gid = c.match.id;
+  assert.equal(gameManager.uniscitiAMatch(gid, 'Bob').ok, true);
+  assert.equal(gameManager.uniscitiAMatch(gid, 'Charlie').ok, true);
+  gameManager.setReady(gid, 'Alice', true);
+  gameManager.setReady(gid, 'Bob', true); // 2 pronti, Charlie no
+  const m = gameManager.getMatch(gid);
+  assert.ok(m.lobbyTimer, 'il countdown deve essere attivo');
+  assert.ok(m.lobbyTimer.tot >= 1, 'tot deve essere > 0');
+  assert.equal(m.state, 'waiting');
+});
+
+test('timer lobby: tutti pronti → timer annullato (avvio immediato gestito dal socket) (DB)', async (t) => {
+  if (!dbDisponibile) return t.skip('DB non disponibile');
+  const c = await gameManager.creaMatch({ creator: 'Alice' });
+  const gid = c.match.id;
+  assert.equal(gameManager.uniscitiAMatch(gid, 'Bob').ok, true);
+  assert.equal(gameManager.uniscitiAMatch(gid, 'Charlie').ok, true);
+  gameManager.setReady(gid, 'Alice', true);
+  gameManager.setReady(gid, 'Bob', true);
+  const m1 = gameManager.getMatch(gid);
+  assert.ok(m1.lobbyTimer, 'il countdown parte con 2 pronti');
+  gameManager.setReady(gid, 'Charlie', true); // tutti pronti
+  const m2 = gameManager.getMatch(gid);
+  assert.equal(m2.lobbyTimer, null, 'timer annullato quando tutti pronti');
+  assert.equal(m2.ready.every((r) => r), true);
+});
+
+test('timer lobby: allo scadere espelle i non-pronti e avvia la partita (DB)', async (t) => {
+  if (!dbDisponibile) return t.skip('DB non disponibile');
+  const c = await gameManager.creaMatch({ creator: 'Alice' });
+  const gid = c.match.id;
+  assert.equal(gameManager.uniscitiAMatch(gid, 'Bob').ok, true);
+  assert.equal(gameManager.uniscitiAMatch(gid, 'Charlie').ok, true);
+  // Accorcia il timer a 1s per il test.
+  gameManager.getMatch(gid).lobbyTimerSecondi = 1;
+  gameManager.setReady(gid, 'Alice', true);
+  gameManager.setReady(gid, 'Bob', true); // Charlie NON pronto
+  const dopo = await aspettaFinche(() => {
+    const p = gameManager.getMatch(gid);
+    return p && p.state === 'running' ? p : null;
+  }, 4000);
+  assert.ok(dopo, 'la partita deve avviarsi allo scadere del timer');
+  assert.deepEqual([...dopo.giocatori].sort(), ['Alice', 'Bob']);
+  assert.equal(dopo.giocatori.includes('Charlie'), false, 'Charlie (non pronto) espulso');
+});
+
+test('timer lobby: se si scende a <2 pronti il timer si annulla (DB)', async (t) => {
+  if (!dbDisponibile) return t.skip('DB non disponibile');
+  const c = await gameManager.creaMatch({ creator: 'Alice' });
+  const gid = c.match.id;
+  assert.equal(gameManager.uniscitiAMatch(gid, 'Bob').ok, true);
+  assert.equal(gameManager.uniscitiAMatch(gid, 'Charlie').ok, true);
+  gameManager.setReady(gid, 'Alice', true);
+  gameManager.setReady(gid, 'Bob', true); // 2 pronti → timer attivo
+  const m1 = gameManager.getMatch(gid);
+  assert.ok(m1.lobbyTimer);
+  gameManager.setReady(gid, 'Bob', false); // torna a 1 pronto → timer annullato
+  const m2 = gameManager.getMatch(gid);
+  assert.equal(m2.lobbyTimer, null, 'timer annullato <2 pronti');
+});
+
 test('sweeper: running con 0 socket e attività stantia → cancellata', async (t) => {
   if (!dbDisponibile) return t.skip('DB non disponibile');
   const { gid } = await creaMatchAvviata();

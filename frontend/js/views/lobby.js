@@ -46,6 +46,13 @@ export function renderLobby(params = {}) {
         <p class="text-small text-muted" style="margin-top: var(--spacing-sm);">👆 Tocca il codice per condividere il link della partita</p>
       </div>
 
+      ${partita.lobbyTimerTimeLeft != null ? `
+        <div class="alert alert-info" style="margin-top: var(--spacing-md);">
+          ⏱ La partita parte tra <strong>${partita.lobbyTimerTimeLeft}</strong>s —
+          chi non è pronto verrà escluso dalla lobby.
+        </div>
+      ` : ''}
+
       <div class="card">
         <div class="players-list-title">Giocatori</div>
         <div class="players-list">

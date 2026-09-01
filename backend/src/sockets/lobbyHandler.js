@@ -80,6 +80,10 @@ function partitaPerLobby(p) {
     gamesToWin: p.gamesToWin ?? p.params?.games_to_win ?? 1,
     punteggio: p.punteggio ?? {},
     giocatoriOriginali: p.giocatoriOriginali ?? [],
+    // Timer partenza lobby (non configurabile in UI)
+    lobbyTimerAttivo: !!p.lobbyTimer,
+    lobbyTimerTimeLeft: p.lobbyTimer?.timeLeft ?? null,
+    lobbyTimerTot: p.lobbyTimer?.tot ?? p.lobbyTimerSecondi ?? 30,
   };
 }
 
