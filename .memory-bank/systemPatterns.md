@@ -85,16 +85,22 @@ TurnManager:
 ```
 Game States:
   waiting    → partita creata, in attesa giocatori (min 2)
-  running    → partita attiva, turni in corso
+  running    → partita attiva, turni/manche in corso
   finished   → partita terminata con vincitore
   cancelled  → creator ha annullato prima dell'inizio
 
 Transitions:
   waiting → running  (tutti ready, parola iniziale generata)
   waiting → cancelled (creator esce)
-  running → finished (un solo giocatore rimasto, o timer expired)
+  running → finished (un solo giocatore rimasto, o raggiunto games_to_win)
   running → cancelled (disconnessione creator + abbandono)
 ```
+
+**Nomenclatura (best-of-N)**: mano=`round`, turno=`turno`, manche=`game`, partita=`match`.
+Gerarchia: **mano** (un giocatore) → **turno** (N mani) → **manche** (vittoria +1 punto) → **partita**
+(vincitore = chi raggiunge `games_to_win`, oppure resta un solo non-abbandonato).
+Regole decise: 3 tentativi/mano (3° errore → limbo); abbandono DEFINITIVO (non rientra); lo stallo
+(ex "pareggio") non chiude nulla (solo nuova parola).
 
 ## 🔐 Pattern di Sicurezza
 - **Validazione input** sia lato client (UX) che server (sicurezza)
