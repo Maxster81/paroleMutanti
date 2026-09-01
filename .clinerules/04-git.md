@@ -19,22 +19,24 @@ Il progetto usa **due repository Git separati** (workflow tipo efftrack):
 4. **Produzione** (server Ubuntu) fa `git pull` dal repo pubblico `paroleMutanti_prod` e rilancia con `deploy/deploy.sh`.
 
 ### Regole operative
-- **MAI** fare sync dev→prod in autonomia: sempre su richiesta esplicita dell'utente.
+- **Commit su `main` (dev)**: LIBERI, NON richiedono l'approvazione dell'utente (regola aggiornata).
+- **Sync dev → prod e PUSH verso la produzione**: SEMPRE richiedono l'approvazione esplicita dell'utente
+  (il push verso `paroleMutanti_prod` / deploy va fatto solo su richiesta).
 - La sync è una whitelist di file: se si aggiunge una cartella root di produzione, aggiungere una riga `--include='cartella/'` e `--include='cartella/***'` in `sync-to-prod.sh`.
 - Commit su dev con Conventional Commits in italiano (vedi sotto).
 
 ## Branching
 
-- **Branch principale**: `main` (sempre stabile e deployabile).
-- **Branch di feature**: `feature/<nome-descrittivo>` (es. `feature/socket-game-events`).
+- **Branch principale**: `main` (sempre stabile e deployabile). Si lavora normalmente direttamente su `main`.
+- **Branch di feature**: `feature/<nome-descrittivo>` (es. `feature/socket-game-events`) — opzionale, temporaneo.
 - **Branch di fix**: `fix/<breve-descrizione>`.
 - **Merge strategy**: squash o merge commit, deciso per branch.
-- **NO commit direttamente su main** se si sta lavorando a una feature (usare PR o merge esplicito).
+- **Commit e merge su `main`**: consentiti in autonomia, NON serve l'approvazione dell'utente.
 
 ### Regola operativa
 Se Cline sta lavorando su un branch di feature/fix:
-1. **NON merge** su `main` in autonomia: chiedere sempre conferma.
-2. **NON push** su `main` direttamente.
+1. Il **merge su `main`** avviene in autonomia, senza chiedere conferma.
+2. Il **push verso la produzione** (`paroleMutanti_prod` / deploy) richiede SEMPRE approvazione.
 3. **NON fare commit di file non correlati** alla feature in corso sul branch.
 
 ## Commit Convention (Conventional Commits in italiano)
