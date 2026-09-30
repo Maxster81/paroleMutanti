@@ -153,9 +153,9 @@ npm run db:reset       # DROP + ricrea schema (ATTENZIONE)
 ## 🚀 Prossimi Step Tecnici
 
 Il progetto è **giocabile end-to-end e live in produzione**. Migliorie possibili:
-- CI (⚠️ il token dell'infrastruttura non può creare file in `.github/workflows`:
-  il workflow va parcheggiato altrove e caricato a mano);
-- stage `test` nell'immagine (`docker build --target test`) per eseguire `npm test`
-  in CI;
-- `helmet` per gli header di sicurezza lato Express (oggi Caddy può aggiungerli);
-- valutazione `node-pg-migrate` per migrazioni versionate.
+- **CI**: workflow pronto in `ci/workflows/ci.yml` — va copiato in
+  `.github/workflows/` con le credenziali dell'utente (il token dell'infrastruttura di
+  sviluppo non può creare file lì). Istruzioni in `ci/README.md`.
+- `helmet` per gli header di sicurezza lato Express (oggi li può aggiungere Caddy);
+- valutazione `node-pg-migrate` per migrazioni versionate;
+- cron di backup sul server (`deploy/backup-docker.sh`, vedi `docs/DEPLOY.md` §7).

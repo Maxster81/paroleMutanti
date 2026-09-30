@@ -166,6 +166,20 @@ DATABASE_URL=postgresql://utente:password@127.0.0.1:5432/parole_mutanti npm test
 docker compose exec app env E2E_URL=http://127.0.0.1:8081 npm test
 ```
 
+## 🤖 CI (GitHub Actions)
+
+Il workflow è pronto in [`ci/workflows/ci.yml`](ci/workflows/ci.yml): esegue i test
+unit e, su uno **stack Docker reale**, build + attesa `healthy` + `/health` + verifica
+del dizionario (≥ 180.000 parole) + e2e Socket.io e browser.
+
+Non è (ancora) in `.github/workflows/`: **va copiato lì una volta**, come spiegato in
+[`ci/README.md`](ci/README.md):
+
+```bash
+mkdir -p .github/workflows && cp ci/workflows/ci.yml .github/workflows/ci.yml
+git add .github/workflows/ci.yml && git commit -m "ci: aggiungi workflow GitHub Actions" && git push
+```
+
 ## 🔐 Sicurezza
 
 - `.env` mai committato (template con placeholder in `.env.example`; in Docker è

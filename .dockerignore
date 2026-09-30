@@ -43,6 +43,7 @@ dist
 build
 
 # --- Contesto di SVILUPPO: resta nel repo dev, non entra nell'immagine --------
+ci
 .clinerules
 .clinerules.local
 .memory-bank
