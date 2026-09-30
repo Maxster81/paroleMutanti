@@ -20,8 +20,9 @@
 # - Il frontend è servito dallo STESSO processo Express, quindi non serve nginx
 #   o un container statico: un solo container applicativo + un container `db`.
 # - Nel container il bind DEVE essere 0.0.0.0 (HOST): Docker pubblica la porta
-#   solo con `-p`/`ports:`. In `.env` HOST=127.0.0.1 (giusto per il bare-metal
-#   dietro Caddy) e il compose lo sovrascrive a 0.0.0.0.
+#   solo con `-p`/`ports:`. In Docker Compose questo è garantito da
+#   `app.environment.HOST` (vince sul valore eventualmente presente nel `.env`,
+#   che è pensato per dev/bare-metal).
 # - `.dockerignore` (root) esclude dal context il contesto di sviluppo
 #   (.clinerules, .memory-bank, test, e2e, docs, .env...): nell'immagine entra
 #   solo ciò che serve a runtime.
