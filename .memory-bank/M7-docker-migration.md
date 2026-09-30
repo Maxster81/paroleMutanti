@@ -25,7 +25,7 @@ Docker **non serve più**: la selezione di cosa entra nell'artefatto la fanno
 | Deploy | systemd + `deploy/deploy.sh` (rsync in `/opt/paroleMutanti`) | **Docker Compose** (`git pull` + `docker compose up -d --build`) |
 | Cartella sul server | clone in `/tmp` o home + runtime in `/opt/paroleMutanti` | **`/srv/apps/parolemutanti`** (clone = runtime) |
 | DB | PostgreSQL 16 dell'host (`parole_user`/`parole_mutanti`) | **container `postgres:16-alpine`** + volume `parolemutanti-pgdata` |
-| Porta | 8090 su loopback | **8081 su loopback** (8080 = altra app, 8090 = vecchio servizio) |
+| Porta | 8090 su loopback (server vecchio) | **8081 su loopback** (8080 = altra app dello stesso server) |
 | Segreti | `/etc/parole-mutanti/.env` (systemd `EnvironmentFile=`) | `.env` nella root del progetto (`env_file:` in Compose, `600`) |
 | Dizionario | scaricato e importato sul server (`npm run db:import`) | **cotto nell'immagine in build**, importato al primo avvio del container |
 | Aggiornamento | `sudo ./deploy/deploy.sh --update` | `git pull && docker compose up -d --build` |
@@ -75,7 +75,7 @@ Docker **non serve più**: la selezione di cosa entra nell'artefatto la fanno
 | **PostgreSQL in container** | nessun conflitto con il Postgres dell'host né con altre app; DB isolato, teardown pulito; nessuna porta pubblicata |
 | **Compose nella root** | `docker compose up -d --build` funziona senza `-f`, `.env` è unico per dev e prod, e Compose legge i `${...}` proprio da quel `.env` |
 | **Un solo container applicativo** | il backend Node serve già il frontend statico: nginx/container statico sarebbero hop in più senza vantaggi |
-| **Porta 8081** | 8080 occupata da BingWLP, 8090 dal vecchio servizio systemd; 8081 era libera |
+| **Porta 8081** | 8080 occupata da un'altra app del server; 8081 era libera |
 | **`init: true` + dumb-init nell'immagine** | l'entrypoint fa `exec node`, quindi Node diventa PID 1: senza init i signal di `docker stop` non arrivano (niente graceful shutdown di pool pg/socket) |
 | **`environment:` oltre a `env_file:`** | `HOST=0.0.0.0` (nel container serve il bind su tutte le interfacce), `PORT=8081`, `NODE_ENV=production` e `DATABASE_URL` con host `db` devono vincere sui valori del `.env` pensati per dev |
 | **`${VAR:?}` su `POSTGRES_PASSWORD`/`SESSION_SECRET`** | fail-fast con messaggio esplicito invece di stack avviato e poi in restart loop |
@@ -127,7 +127,7 @@ root nella sandbox, replicando la sequenza dell'entrypoint:
 Da verificare sul server (a cura dell'utente): `docker compose up -d --build`,
 stato `healthy` dei due container, `curl http://127.0.0.1:8081/health`, Caddy su
 `https://parolemutanti.maxster.top`, partita reale dal browser. Passi e pulizia
-del vecchio servizio in `docs/DEPLOY.md` §3, §4, §8, §9.
+e Caddy in `docs/DEPLOY.md` §3, §4, §8.
 
 ## 7. Trappole e manutenzione
 

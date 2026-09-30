@@ -8,8 +8,8 @@
   (`postgres:16-alpine`) + volume `parolemutanti-pgdata`.
 - **Reverse proxy**: **Caddy sull'host** (systemd) → `reverse_proxy 127.0.0.1:8081`.
 - **Cartella server**: `/srv/apps/parolemutanti` (clone = runtime).
-- **Porta**: 8081 (container e host-loopback). 8080 = BingWLP, 8090 = vecchio
-  servizio systemd di Parole Mutanti.
+- **Porta**: 8081 (container e host-loopback). La 8080 è occupata da un'altra
+  app dello stesso server.
 - **Bootstrap container** (`deploy/docker-entrypoint.sh`): `wait-for-db` →
   `init-db` (schema idempotente) → `seed-words` (dizionario cotto in immagine) →
   `node backend/src/server.js`.

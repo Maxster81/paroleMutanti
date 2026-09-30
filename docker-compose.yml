@@ -73,8 +73,8 @@ services:
       # controllo è a costo zero: se la tabella non è vuota il seed salta).
       SEED_WORDS: "1"
     ports:
-      # SOLO loopback: l'ingresso pubblico è Caddy (TLS). 8081 libera (8080 =
-      # altra app, 8090 = vecchio servizio systemd di Parole Mutanti).
+      # SOLO loopback: l'unico ingresso pubblico è Caddy (TLS). 8081 è libera
+      # (la 8080 è occupata da un'altra app dello stesso server).
       - "127.0.0.1:8081:8081"
     depends_on:
       db:

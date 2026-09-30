@@ -55,12 +55,13 @@ Punti chiave:
 
 - **Un solo container applicativo**: il backend Node serve anche il frontend
   (`frontend/`), quindi non serve nginx né un container statico.
-- **Porta 8081 su loopback**: l'unico ingresso pubblico è Caddy. (8080 è
-  occupata da un'altra app, 8090 era la porta del vecchio servizio systemd.)
+- **Porta 8081 su loopback**: l'unico ingresso pubblico è Caddy. (La 8080 è
+  occupata da un'altra app dello stesso server; la 8081 è stata scelta libera.)
 - **PostgreSQL in container con volume nominato**: non si tocca il PostgreSQL
   dell'host e non ci sono conflitti di porta sulla 5432.
-- **Nessun dato di gioco da migrare**: le partite vivono in RAM. Nel DB restano
-  solo il dizionario delle parole (rigenerabile) e i feedback degli utenti.
+- **Nessun dato da migrare**: le partite vivono in RAM e il dizionario delle
+  parole viene rigenerato in build. L'unico dato persistente è la tabella
+  `feedback` (nella propria installazione parte vuota).
 - **Un solo repository**: non esiste più il modello dev→prod con script di sync.
   Con Docker la separazione la fanno `deploy/Dockerfile` + `.dockerignore`
   (nell'immagine entra solo ciò che serve a runtime).
@@ -77,6 +78,7 @@ Punti chiave:
 | DNS | record A `parolemutanti.maxster.top` → IP del server |
 | Porte | 22 (SSH), 80, 443 aperte; **8081 libera su loopback** |
 | Runtime | Docker + plugin Compose già installati (verifica: `docker compose version`) |
+| Repo | `github.com/Maxster81/paroleMutanti` è **pubblico**: il clone non richiede credenziali |
 | Rete in build | la build scarica i dizionari (~90 MB da Hugging Face + 1,3 MB da GitHub) |
 
 Verifica rapida prima di iniziare:
@@ -85,43 +87,119 @@ Verifica rapida prima di iniziare:
 docker --version && docker compose version
 lsb_release -a && free -h && df -h /
 getent hosts parolemutanti.maxster.top    # deve già risolvere a questo server
-sudo ss -tlnp | grep -E ':(8080|8081|8090)\s'   # 8081 deve essere LIBERA
+sudo ss -tlnp | grep -E ':(8080|8081)\s'  # 8081 deve essere LIBERA
 ```
 
 ---
 
 ## 3. Primo deploy (Docker)
+### 3.1 Clona il repo (branch corretto)
+
+Il repo è **pubblico**, quindi nessuna credenziale da configurare.
 
 ```bash
-# 1) Porta il repo sul server (cartella standard di questo server)
 sudo mkdir -p /srv/apps
 cd /srv/apps
 sudo git clone https://github.com/Maxster81/paroleMutanti.git parolemutanti
 sudo chown -R "$USER":"$USER" /srv/apps/parolemutanti
 cd /srv/apps/parolemutanti
+```
 
-# 2) Configurazione: dal modello al file reale
+Il comando sopra porta giù il branch **`main`**. Se il lavoro non è ancora unito a
+`main` e vuoi deployare un **branch specifico** (es. `cline/x4fjnsby`), clona
+direttamente quel branch:
+
+```bash
+# opzione A: clonare SOLO quel branch (tracking automatico)
+git clone --branch cline/x4fjnsby --single-branch \
+  https://github.com/Maxster81/paroleMutanti.git parolemutanti
+
+# opzione B: hai già clonato main → passa al branch
+cd parolemutanti
+git fetch origin
+git checkout cline/x4fjnsby      # crea il branch locale che traccia origin/cline/x4fjnsby
+git branch --show-current        # verifica: deve stampare il branch atteso
+```
+
+> Da qui in avanti `git pull` (in §7) aggiorna **il branch su cui sei**. Quando il
+> branch sarà unito a `main`, conviene passare a `main` (`git checkout main && git pull`)
+> così gli aggiornamenti seguono la linea principale.
+
+### 3.2 Genera i segreti (`.env`)
+
+```bash
 cp .env.example .env
 sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
 sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
 chmod 600 .env
+```
 
-# Opzionale: chiave DeepSeek (fallback AI) e bot Telegram.
-# Se arrivi dal vecchio deploy systemd, i valori sono nel vecchio env:
-#   sudo grep -E '^(DEEPSEEK_API_KEY|TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID)=' /etc/parole-mutanti/.env
-# e incollali in .env (nano .env).
+> `POSTGRES_PASSWORD` e `SESSION_SECRET` sono **obbligatorie**: se restano vuote
+> `docker compose` si ferma subito con un messaggio esplicito (interpolazione
+> `${VAR:?}`) invece di avviare uno stack rotto. Sono generate qui: non serve
+> ricordarle.
 
-# 3) Build + avvio (il primo avvio applica lo schema e importa il dizionario)
+### 3.3 Variabili opzionali (DeepSeek e Telegram)
+
+Sono tutte opzionali: senza di esse il gioco funziona (il fallback AI si disattiva
+e il form di feedback salva comunque nel DB, solo senza notifica).
+
+```bash
+nano .env
+```
+
+**DeepSeek** (fallback di validazione delle parole):
+
+```dotenv
+DEEPSEEK_API_KEY=sk-...      # pannello DeepSeek → API keys (platform.deepseek.com)
+```
+
+**Telegram** (notifica dei feedback — come recuperare il token che non ricordi):
+
+1. **Token del bot** — su Telegram scrivi a **@BotFather**:
+   - se il bot esiste ancora: `/mybots` → scegli il bot → **API Token** (mostra il
+     token attuale e permette di revocarlo); in alternativa `/token` + seleziona il bot;
+   - se non lo trovi più: `/newbot` → nome + username (deve finire con `bot`) →
+     BotFather risponde con `Use this token to access the HTTP API: 123456789:AA...`.
+
+2. **Chat ID** (dove arrivano i messaggi) — due modi:
+   - scrivi un messaggio qualsiasi al tuo bot, poi:
+     ```bash
+     curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | grep -o '"chat":{"id":[-0-9]*'
+     ```
+     il numero che esce è il `TELEGRAM_CHAT_ID` (per i gruppi è negativo: aggiungi
+     il bot al gruppo e invia un messaggio lì);
+   - oppure apri **@userinfobot** e leggi l'`Id` che ti risponde (chat privata).
+
+3. **Verifica prima di andare in produzione**:
+   ```bash
+   curl -s -X POST "https://api.telegram.org/bot<TOKEN>/sendMessage" \
+     -d chat_id=<CHAT_ID> -d text="test da Parole Mutanti"
+   # → {"ok":true,...}  (se ricevi il messaggio, i due valori sono giusti)
+   ```
+
+4. Nel `.env`:
+   ```dotenv
+   TELEGRAM_BOT_TOKEN=123456789:AA...
+   TELEGRAM_CHAT_ID=123456789
+   ```
+
+Dopo ogni modifica al `.env` applica con `docker compose up -d` (ricrea il container
+`app`; il volume del DB non viene toccato). Prova poi il form di feedback nell'app:
+`/api/feedback` risponde `{"ok":true,...,"telegram":true}`.
+
+### 3.4 Build e avvio
+
+```bash
+# il primo avvio applica lo schema e importa il dizionario cotto nell'immagine
 docker compose up -d --build
 
-# 4) Stato
+# stato
 docker compose ps
 docker compose logs -f app     # attesa DB → schema → seed dizionario → server avviato
 ```
 
-> `POSTGRES_PASSWORD` e `SESSION_SECRET` sono obbligatorie: se restano vuote
-> `docker compose` si ferma subito con un messaggio esplicito (interpolazione
-> `${VAR:?}`) invece di avviare uno stack rotto.
+
 
 ---
 
@@ -269,78 +347,12 @@ Note:
   servono direttive aggiuntive.
 - Se vuoi anche gli header di sicurezza (HSTS/CSP), puoi aggiungere un blocco
   `header { ... }` dentro il site — non è necessario per il funzionamento.
-- Il vecchio blocco che puntava a `127.0.0.1:8090` (deploy systemd) va rimosso:
-  vedi §9.
+- Se sul server gira già un'altra app (es. sulla 8080), il suo blocco Caddy resta
+  **separato**: un site block per dominio.
 
 ---
 
-## 9. Migrazione dal vecchio deploy (systemd) e pulizia
-
-### 9.1 Prima di iniziare
-
-```bash
-# Cosa gira ora e su quali porte
-sudo ss -tlnp | grep -E ':(8080|8081|8090)\s'
-systemctl status parole-mutanti --no-pager
-sudo grep -E '^(PORT|HOST|DATABASE_URL)=' /etc/parole-mutanti/.env 2>/dev/null
-sudo systemctl cat parole-mutanti | grep -E 'EnvironmentFile|WorkingDirectory'
-```
-
-### 9.2 Fermare il vecchio servizio
-
-```bash
-sudo systemctl disable --now parole-mutanti
-sudo ss -tlnp | grep -E ':(8080|8081|8090)\s'   # la porta del vecchio servizio deve essere libera
-```
-
-Il vecchio PostgreSQL **dell'host** resta attivo e non dà fastidio: il nuovo
-stack usa un PostgreSQL in container. Non spegnerlo finché non hai verificato
-che nessun'altra app lo usi.
-
-### 9.3 Installare il nuovo stack
-
-Segui §3 (clone in `/srv/apps/parolemutanti`, `.env`, `docker compose up -d
---build`) e §8 (Caddy → 8081).
-
-### 9.4 Verifica positiva
-
-```bash
-docker compose ps                                  # app + db "healthy"
-curl -s http://127.0.0.1:8081/health               # database: ok
-docker compose exec app npm run db:check           # ~185k parole
-curl -sI https://parolemutanti.maxster.top/health  # 200 via Caddy
-# + partita di prova dal browser (due giocatori)
-```
-
-### 9.5 Pulizia (SOLO dopo la verifica)
-
-<details>
-<summary>Lista di ciò che si può rimuovere/archiviare</summary>
-
-| Elemento | Comando | Note |
-| -------- | ------- | ---- |
-| Servizio systemd | `sudo systemctl disable --now parole-mutanti` + `sudo rm /etc/systemd/system/parole-mutanti.service` + `sudo systemctl daemon-reload` | il file unit è in `deploy/parole-mutanti.service` (resta nel repo per il bare-metal) |
-| Vecchio blocco Caddy su `:8090` | rimuovi il site `/etc/caddy/sites/parole-mutanti.conf` e `sudo systemctl reload caddy` | sostituito dal blocco §8 |
-| Codice copiato dal vecchio deploy | `sudo rm -rf /opt/paroleMutanti` | **attenzione**: `/opt/paroleMutanti/backups` contiene i dump del vecchio DB → spostali prima |
-| Env di systemd | `sudo rm -rf /etc/parole-mutanti` | **prima** copia `DEEPSEEK_API_KEY`/`TELEGRAM_*` nel nuovo `.env` |
-| Utente/group di sistema | `sudo userdel parole-mutanti` | opzionale, solo se non usato da altro |
-| Cron dei backup host | `sudo rm -f /etc/cron.d/parole-mutanti-backup` | sostituito da §7 |
-| DB PostgreSQL dell'host | `sudo -u postgres psql -c "DROP DATABASE parole_mutanti;"` e `-c "DROP USER parole_user;"` | opzionale: **verifica prima** che nessun'altra app usi utente/DB (`sudo -u postgres psql -c "\l"`) |
-| Repo di produzione | archiviazione a cura tua | il repo di produzione non è più referenziato da questo repository |
-
-Prima di droppare il DB dell'host, se vuoi conservare i feedback esistenti:
-
-```bash
-sudo -u postgres pg_dump -d parole_mutanti -t feedback --data-only > /tmp/feedback.sql
-# poi, con lo stack Docker attivo:
-cat /tmp/feedback.sql | docker compose exec -T db psql -U parole_user -d parole_mutanti
-```
-
-</details>
-
----
-
-## 10. Porta e personalizzazione
+## 9. Porta e personalizzazione
 
 | Cosa | Dove si cambia |
 | ---- | -------------- |
@@ -356,7 +368,7 @@ occupata da un'altra app.
 
 ---
 
-## 11. Alternativa bare-metal (systemd)
+## 10. Alternativa bare-metal (systemd)
 
 Se su un server non è disponibile Docker, il deploy con systemd + PostgreSQL
 dell'host resta possibile: vedi [`deploy/README.md`](../deploy/README.md).
@@ -366,7 +378,7 @@ installa il servizio.
 
 ---
 
-## 12. Troubleshooting
+## 11. Troubleshooting
 
 | Sintomo | Diagnosi / rimedio |
 | ------- | ------------------ |

@@ -220,7 +220,7 @@ M7 (Docker):           [██████████] 100%  ✅ COMPLETATA lat
 ## 🐛 Issue Aperte
 - **MCP filesystem**: config già aggiornata per includere `/home/death/paroleMutanti`; **serve riavvio di Cline** (o "Retry" sul banner) perché diventi effettivo.
 - **Verifica sul server (M7)**: build/`docker compose up` non eseguibili nella sandbox di
-  sviluppo → l'utente deve eseguire i passi di `docs/DEPLOY.md` §3-§4 e §9 (migrazione).
+  sviluppo → l'utente deve eseguire i passi di `docs/DEPLOY.md` §3-§4 (deploy) e §8 (Caddy).
   Punti più probabili in caso di problemi: porta 8081 già occupata,
   `POSTGRES_PASSWORD`/`SESSION_SECRET` vuote, RAM insufficiente in build.
 
@@ -232,6 +232,6 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
 - ✅ Deploy **Docker Compose** (M7): app + PostgreSQL in container, dizionario cotto in
   build e importato al primo avvio, Caddy sull'host su `127.0.0.1:8081`
 - ✅ Repo **unico**: nessun repo di produzione, nessuno script di sincronizzazione
-- ➡️ Passi a cura dell'utente: migrare il server (`docs/DEPLOY.md` §3-§4 e §9),
+- ➡️ Passi a cura dell'utente: installare sul server nuovo (`docs/DEPLOY.md` §3-§4 e §8),
   verificare il gioco, poi pulizia (systemd, `/opt/paroleMutanti`, `/etc/parole-mutanti`)
   e archiviazione del vecchio repo di produzione
