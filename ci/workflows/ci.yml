@@ -75,6 +75,10 @@ jobs:
           cp .env.example .env
           sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
           sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+          # DEEPSEEK_API_KEY nel modello è un placeholder (sk-CAMBIAMI): in produzione
+          # config.js esce subito con errore (chiave < 20 caratteri). In CI la AI non
+          # serve: la svuotiamo (fallback AI disattivato, gioco completo).
+          sed -i "s|^DEEPSEEK_API_KEY=.*|DEEPSEEK_API_KEY=|" .env
 
       - name: Build e avvio dello stack
         run: docker compose up -d --build

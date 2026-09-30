@@ -141,6 +141,9 @@ git branch --show-current        # verifica: deve stampare il branch atteso
 cp .env.example .env
 sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
 sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+# Se non usi il fallback AI subito (o mai), svuota anche la chiave DeepSeek:
+# il placeholder "sk-CAMBIAMI" in produzione BLOCCA l'avvio (fail-fast di config.js).
+sed -i "s|^DEEPSEEK_API_KEY=.*|DEEPSEEK_API_KEY=|" .env
 chmod 600 .env
 ```
 
