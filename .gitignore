@@ -56,6 +56,10 @@ db/dumps/
 # Stato update dizionari (ETag salvati da check-update.mjs)
 db/.last-*
 
+# Artefatto dizionario per l'immagine Docker (generato da db/export-dicts.mjs
+# oppure nella stage builder del Dockerfile: NON va committato)
+dict/
+
 # Certificati locali / chiavi
 *.pem
 *.key
@@ -67,6 +71,3 @@ frontend/assets/audio/*.tmp
 
 # File di stato Cline
 .clinerules.local
-
-# Marker locale di sincronizzazione (sync-to-prod.sh, NON committare)
-.last-sync-dev-commit

@@ -1,0 +1,98 @@
+# =============================================================================
+# docker-compose.yml — Parole Mutanti (deploy PRIMARIO)
+# =============================================================================
+# Stack: `app` (Node 24, serve API + Socket.io + frontend) + `db` (PostgreSQL 16).
+#
+# Uso (dalla root del repo, dove sta anche `.env`):
+#   cp .env.example .env      # poi valorizza POSTGRES_PASSWORD e SESSION_SECRET
+#   docker compose up -d --build
+#   docker compose ps
+#   docker compose logs -f app
+#
+# Note:
+# - la porta host è pubblicata SOLO su loopback (127.0.0.1:8081): l'unico
+#   ingresso pubblico è Caddy sull'host (vedi docs/DEPLOY.md → blocco Caddy)
+# - il DB NON pubblica porte sull'host: si raggiunge solo via rete interna
+#   (`docker compose exec db psql -U ...`), il che evita di esporre il
+#   PostgreSQL e di riusare la 5432 dell'host (occupata da altre app)
+# - `env_file: .env` passa le variabili dell'app (DeepSeek, Telegram, log,
+#   gioco...); `environment:` sovrascrive i valori che nel container devono
+#   essere diversi (HOST, PORT, DATABASE_URL)
+# - `POSTGRES_*` e `SESSION_SECRET` vengono letti dal `.env` nella root
+#   (interpolazione di Compose) e con `:?` fanno fallire l'avvio se mancano
+# =============================================================================
+
+name: parolemutanti
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: parolemutanti-db
+    restart: unless-stopped
+    init: true
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-parole_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definisci POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-parole_mutanti}
+    volumes:
+      # Volume nominato: i dati sopravvivono a rebuild/restart del container.
+      - parolemutanti-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  app:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    image: parolemutanti:latest
+    container_name: parolemutanti-app
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      # Nel container il bind è 0.0.0.0 (il .env ha 127.0.0.1, giusto per il
+      # bare-metal dietro Caddy): è Docker a pubblicare la porta, su loopback.
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8081"
+      # DATABASE_URL ha la precedenza su quella (eventualmente) presente nel .env:
+      # dentro la rete di Compose il DB si chiama `db`.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-parole_user}:${POSTGRES_PASSWORD:?definisci POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-parole_mutanti}
+      SESSION_SECRET: ${SESSION_SECRET:?genera SESSION_SECRET con openssl rand -hex 32}
+      # Primo avvio: popola `words` dall'artefatto cotto nell'immagine (poi il
+      # controllo è a costo zero: se la tabella non è vuota il seed salta).
+      SEED_WORDS: "1"
+    ports:
+      # SOLO loopback: l'ingresso pubblico è Caddy (TLS). 8081 libera (8080 =
+      # altra app, 8090 = vecchio servizio systemd di Parole Mutanti).
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8081/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Generoso: al primo avvio l'entrypoint applica lo schema e importa il
+      # dizionario (~185k parole) prima di mettere in ascolto il server.
+      start_period: 180s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  parolemutanti-pgdata:
+    name: parolemutanti-pgdata

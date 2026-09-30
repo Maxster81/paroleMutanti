@@ -1,0 +1,77 @@
+# =============================================================================
+# .dockerignore — Parole Mutanti (context della build Docker = root del repo)
+# =============================================================================
+# Serve a due cose:
+#   1. SICUREZZA: i segreti (.env) e i file personali non entrano MAI nel
+#      context della build (e quindi non possono finire nell'immagine)
+#   2. VELOCITÀ/PULIZIA: il context passa da ~150 MB (node_modules + .git) a
+#      poche centinaia di KB
+#
+# Regola d'oro: qui dentro NON deve esistere nulla che il Dockerfile copia.
+# File copiati dal Dockerfile: package.json, package-lock.json, db/,
+# backend/, frontend/, deploy/docker-entrypoint.sh.
+# =============================================================================
+
+# --- Git / CI / IDE -----------------------------------------------------------
+.git
+.gitignore
+.gitattributes
+.github
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+
+# --- Segreti (MAI nell'immagine) ---------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+deploy/certs
+
+# --- Dipendenze e cache locali ------------------------------------------------
+node_modules
+.npm
+.npmrc
+npm-debug.log*
+coverage
+dist
+build
+
+# --- Contesto di SVILUPPO: resta nel repo dev, non entra nell'immagine --------
+.clinerules
+.clinerules.local
+.memory-bank
+docs
+e2e
+playwright.config.js
+playwright-report
+test-results
+backend/tests
+backend/scripts
+**/*.md
+
+# --- Artefatti locali del dizionario / dump ----------------------------------
+dict
+db/data
+db/dumps
+db/.last-*
+*.sql.gz
+*.dump
+
+# --- Deploy bare-metal (Docker non ne ha bisogno) ----------------------------
+deploy/README.md
+deploy/deploy.sh
+deploy/backup.sh
+deploy/backup-docker.sh
+deploy/parole-mutanti.service
+deploy/Caddyfile.prod.snippet
+
+# --- File Docker stessi (non servono dentro l'immagine) ----------------------
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
