@@ -144,11 +144,22 @@ Nota: il seed sul server è ~9,5 s (contro ~2 s della sandbox di sviluppo): coer
 con l'I/O del disco della VPS e comunque ampiamente coperto dallo `start_period` di
 180 s dell'healthcheck.
 
-Resta da verificare (a cura dell'utente): blocco Caddy su
-`https://parolemutanti.maxster.top`, partita reale a due giocatori dal browser, invio
-del form di feedback (con e senza Telegram), cron di backup. Passi: `docs/DEPLOY.md`
-§4 e §8.
+### Chiusura M7 (2026-09-30, sera) — TUTTO VERIFICATO
 
+- ✅ Caddy + partita reale: **app funzionante identica a prima** (conferma utente)
+- ✅ DeepSeek e Telegram: **configurati e funzionanti** (conferma utente)
+- ✅ Clone server **ricreato normale su main**: il clone --single-branch non
+  permetteva `git checkout main` (neanche dopo il fetch esplicito del ref) →
+  risolto riclonando la folder, su suggerimento dell’utente; volume DB intatto,
+  185.723 parole confermate senza reimport
+- ✅ **CI attiva e verde** (run 36734200783, 6m05s): `Unit test` 10s ✓,
+  `Stack Docker` 5m20s ✓ — stack healthy, dizionario 185.723 parole, immagine
+  pulita (uid 10001), e2e Socket.io eseguito (0 skip), e2e browser **1 passed**
+- ✅ Fix CI: la prima run rossa era il placeholder `DEEPSEEK_API_KEY=sk-CAMBIAMI`
+  (fail-fast di config.js in produzione) → ora la CI la svuota e `.env.example`
+  parte con la chiave vuota; aggiornare `.github/workflows/` resta manuale (il token
+  dell’infrastruttura non può né creare né aggiornare i workflow)
+- ⏸️ Unica cosa rimasta: cron di backup (parcheggiato dall’utente, `docs/DEPLOY.md` §7)
 ## 7. Trappole e manutenzione
 
 - **Porta in tre punti**: cambiandola, aggiornare `app.environment.PORT`,
