@@ -75,8 +75,7 @@ Stack: container `app` (Node — serve API, Socket.io e frontend) + container `d
 direttamente).
 
 > Guida completa — architettura, prime installazioni, **verifica del
-> dizionario**, aggiornamenti, backup, migrazione dal vecchio servizio systemd,
-> troubleshooting: [`docs/DEPLOY.md`](docs/DEPLOY.md)
+> dizionario**, aggiornamenti, backup, notifiche Telegram, troubleshooting: [`docs/DEPLOY.md`](docs/DEPLOY.md)
 
 ```bash
 # Sul server (Ubuntu; Docker + plugin Compose già installati)
@@ -151,7 +150,7 @@ paroleMutanti/
 │   └── README.md           # guida bare-metal
 ├── docker-compose.yml  # stack: app + db (build dalla root)
 ├── .dockerignore       # esclude contesto di sviluppo e segreti dalla build
-├── docs/DEPLOY.md      # guida deploy Docker + migrazione
+├── docs/DEPLOY.md      # guida deploy Docker completa
 ├── .env.example        # Template env vars
 └── README.md
 ```
