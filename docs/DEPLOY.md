@@ -122,8 +122,18 @@ git branch --show-current        # verifica: deve stampare il branch atteso
 ```
 
 > Da qui in avanti `git pull` (in §7) aggiorna **il branch su cui sei**. Quando il
-> branch sarà unito a `main`, conviene passare a `main` (`git checkout main && git pull`)
-> così gli aggiornamenti seguono la linea principale.
+> branch è unito a `main`, per passare alla linea principale:
+>
+> ```bash
+> # con un clone --single-branch serve prima un fetch esplicito di main
+> # (altrimenti: error: pathspec 'main' did not match any file(s) known to git)
+> git fetch origin main:refs/remotes/origin/main
+> git checkout main && git pull
+> ```
+>
+> (Con un clone normale — senza `--single-branch` — il fetch non serve: `git checkout main`
+> trova il ramo da solo. Con `--single-branch` il repo locale conosce solo il branch
+> clonato, quindi `main` va fetchato esplicitamente prima del checkout.)
 
 ### 3.2 Genera i segreti (`.env`)
 
