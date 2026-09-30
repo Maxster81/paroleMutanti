@@ -322,6 +322,38 @@ gunzip -c backups/parole_mutanti-<timestamp>.sql.gz \
 
 ---
 
+### Conserva il `.env` (importante)
+
+Il volume `parolemutanti-pgdata` contiene le credenziali **inizializzate al primo
+avvio**: la password di `POSTGRES_PASSWORD` viene applicata al ruolo solo quando il
+data dir è vuoto. Conseguenze pratiche:
+
+- **Fai una copia sicura del `.env`** (contiene `POSTGRES_PASSWORD`, `SESSION_SECRET`
+  e le chiavi opzionali). Se lo perdi, `docker compose` non riesce più a partire
+  (fail-fast su `${POSTGRES_PASSWORD:?}`) e serve comunque la password per accedere
+  ai dati:
+
+  ```bash
+  cp .env ~/.parolemutanti.env.backup && chmod 600 ~/.parolemutanti.env.backup
+  ```
+
+- **Cambiare `POSTGRES_PASSWORD` nel `.env` dopo il primo avvio NON cambia la password
+  del DB** (il ruolo esiste già): l'app smetterebbe di connettersi. Per cambiarla
+  davvero, allinea i due lati:
+
+  ```bash
+  NEW=$(openssl rand -hex 24)
+  sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$NEW|" .env
+  docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+    -c "ALTER USER $POSTGRES_USER WITH PASSWORD '$NEW';"
+  docker compose up -d          # ricrea `app` con il nuovo DATABASE_URL
+  ```
+
+- Il dizionario delle parole è **rigenerabile** (cotto nell'immagine): il backup del
+  DB serve solo per i **feedback** e per non dover riconfigurare nulla.
+
+---
+
 ## 8. Caddy (reverse proxy sull'host)
 
 Aggiungi questo blocco al Caddyfile (o a un file incluso in `/etc/caddy/sites/`):
