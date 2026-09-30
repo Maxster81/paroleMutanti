@@ -124,10 +124,30 @@ root nella sandbox, replicando la sequenza dell'entrypoint:
 | Test di gioco end-to-end (socket) | **11/11**: create → join → ready → parola iniziale dal dizionario → `submit_word` valido (`source=LO`) → parola inventata respinta (`ai_errore`, nessuna chiave DeepSeek) → parola identica respinta (`parola_gia_usata`) |
 | `npm test` (unit + e2e socket contro server reale) | **64/64 pass**, 0 fail, 0 skip |
 
-Da verificare sul server (a cura dell'utente): `docker compose up -d --build`,
-stato `healthy` dei due container, `curl http://127.0.0.1:8081/health`, Caddy su
-`https://parolemutanti.maxster.top`, partita reale dal browser. Passi e pulizia
-e Caddy in `docs/DEPLOY.md` §3, §4, §8.
+### Verifica sul SERVER di produzione (2026-09-30) — SUPERATA
+
+Server **nuovo e pulito** (nessun vecchio servizio da dismettere). Evidenze raccolte
+sul server:
+
+| Verifica | Esito |
+|---|---|
+| `docker compose ps` | `parolemutanti-app` **healthy** su `127.0.0.1:8081->8081/tcp`; `parolemutanti-db` **healthy** (5432 solo interno, nessuna porta pubblicata) |
+| `curl http://127.0.0.1:8081/health` | `{"status":"ok","database":"ok","version":"1.6.0","env":"production"}` |
+| `GET /` (frontend) | HTTP 200 |
+| Bootstrap nei log | wait-for-db (1º tentativo) → schema idempotente → seed **185.723 parole in 9,5 s** → `server_avviato` su 8081 |
+| `docker compose exec app npm run db:check` | 185.723 parole, distribuzione per lunghezza identica alla build, query random 5-6 ms |
+| `docker compose exec db psql ...` | distribuzione coerente (3→581 … 10→56.635) |
+| `node db/seed-words.mjs --force` | TRUNCATE + reimport: **185.723 parole in 9,6 s** |
+| DB | PostgreSQL **16.15** (container `postgres:16-alpine`) |
+
+Nota: il seed sul server è ~9,5 s (contro ~2 s della sandbox di sviluppo): coerente
+con l'I/O del disco della VPS e comunque ampiamente coperto dallo `start_period` di
+180 s dell'healthcheck.
+
+Resta da verificare (a cura dell'utente): blocco Caddy su
+`https://parolemutanti.maxster.top`, partita reale a due giocatori dal browser, invio
+del form di feedback (con e senza Telegram), cron di backup. Passi: `docs/DEPLOY.md`
+§4 e §8.
 
 ## 7. Trappole e manutenzione
 
