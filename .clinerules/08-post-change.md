@@ -19,7 +19,10 @@ Prima di committare qualsiasi modifica funzionale (backend o UI), verificare **i
 - [ ] **Verifica browser (se UI)**: se il task ha toccato CSS/HTML/JS, usare Playwright MCP (`browser_navigate` + `browser_snapshot`/`browser_take_screenshot`) per verificare resa, accessibilità, console pulita.
 - [ ] **Logging**: nessuna password, API key, parola completa dell'utente nei log?
 - [ ] **Config**: i nuovi parametri sono in `.env.example` con default sicuro?
-- [ ] **Deploy**: se il task tocca env var, configurazione o architettura, verificare che `deploy/parole-mutanti.service` e `deploy/Caddyfile.prod.snippet` siano allineati?
+- [ ] **Deploy**: se il task tocca env var, configurazione o architettura, verificare
+      che siano allineati `docker-compose.yml`, `.env.example`, `deploy/Dockerfile`,
+      `.dockerignore` e (per il percorso bare-metal) `deploy/parole-mutanti.service` +
+      `deploy/Caddyfile.prod.snippet`?
 - [ ] **Test**: `npm test` eseguibile e tutti verdi?
 - [ ] **Audio (se UI)**: Web Audio API non inizia prima di un user gesture (politica autoplay dei browser)?
 - [ ] **CORS/CSRF**: nuovi endpoint rispettano le policy di CORS e rate limit del progetto?

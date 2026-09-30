@@ -1,5 +1,29 @@
 # System Patterns — Architettura
 
+## 🐳 Topologia di deploy (Docker, da M7)
+
+```
+   INTERNET ──▶ Caddy (HOST, systemd, TLS Let's Encrypt)
+                  encode zstd gzip · reverse_proxy 127.0.0.1:8081
+                            │
+   ─────────── rete di Docker Compose ───────────────
+                            ▼
+   container `parolemutanti-app` (node:24-alpine, uid 10001, non root, init: true)
+     entrypoint: wait-for-db → init-db (schema idempotente) → seed-words → node server.js
+     Express + Socket.io + frontend statico (un solo processo)
+                            │ hostname `db`
+                            ▼
+   container `parolemutanti-db` (postgres:16-alpine)
+     volume `parolemutanti-pgdata` · nessuna porta pubblicata
+```
+
+- **Repo unico**: nessun repo di produzione, nessuno script di sync. La selezione
+  dei file per l'immagine è `.dockerignore` + i `COPY` espliciti del Dockerfile.
+- **Dizionario cotto in build** (`db/export-dicts.mjs` → `dict/words.tsv.gz`) e
+  importato al primo avvio (`db/seed-words.mjs`: no-op se `words` è già popolata).
+- Cartella server `/srv/apps/parolemutanti`; aggiornamento `git pull && docker compose up -d --build`.
+- Alternativa bare-metal (systemd + PostgreSQL host + porta 8090) in `deploy/README.md`.
+
 ## 🏗️ Architettura ad alto livello
 
 ```

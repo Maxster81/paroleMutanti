@@ -1,13 +1,20 @@
-# Deploy di Parole Mutanti (produzione)
+# Deploy bare-metal di Parole Mutanti (alternativa a Docker)
 
-Guida passo-passo per installare e aggiornare **Parole Mutanti** su un server Ubuntu
-con systemd + Caddy + PostgreSQL.
+> ⚠️ **Questo è il percorso SECONDARIO.** Il deploy primario è **Docker Compose**:
+> vedi [`docs/DEPLOY.md`](../docs/DEPLOY.md) e `docker-compose.yml` nella root.
+> Usa questa guida solo su un server **senza Docker**.
+>
+> La sorgente è **questo** repository (non esiste più un repo di produzione
+> separato né uno script di sincronizzazione dev→prod).
+
+Guida passo-passo per installare e aggiornare **Parole Mutanti** su un server
+Ubuntu con systemd + Caddy + PostgreSQL **dell'host**.
 
 ## 🏠 Architettura (dove va cosa)
 
 | Elemento | Percorso |
 |---|---|
-| Clone sorgente (dove lanci `deploy.sh`) | a tua scelta (es. `/home/<user>/paroleMutanti_prod`, **anche `/tmp/`**) |
+| Clone sorgente (dove lanci `deploy.sh`) | a tua scelta (es. `/srv/apps/parolemutanti`, **anche `/tmp/`**) |
 | Codice eseguito (runtime) | `/opt/paroleMutanti` |
 | Segreti (env) | `/etc/parole-mutanti/.env` (permessi `600`) |
 | Backup DB | `/opt/paroleMutanti/backups` |
@@ -20,23 +27,24 @@ con systemd + Caddy + PostgreSQL.
 ## ✅ Prerequisiti
 - Ubuntu con systemd
 - Accesso root (`sudo`)
-- Dominio che punta all'IP del server (es. `example.com`)
+- PostgreSQL 16 installato sull'host
+- Dominio che punta all'IP del server (es. `parolemutanti.maxster.top`)
 - Certificati TLS (se riusi quelli esistenti) **oppure** Let's Encrypt automatico
 
 ## 🚀 Primo deploy
 
 ```bash
-# 1. Clona il repo prod in una cartella a tua scelta (anche /tmp)
-cd /home/<user>            # oppure: cd /tmp
-git clone https://github.com/Maxster81/paroleMutanti_prod.git paroleMutanti_prod
-cd paroleMutanti_prod
+# 1. Clona il repo in una cartella a tua scelta (anche /tmp)
+cd /srv/apps
+git clone https://github.com/Maxster81/paroleMutanti.git parolemutanti
+cd parolemutanti
 
 # 2. Deploy completo (install + env + db + service + backup + caddy)
 sudo ./deploy/deploy.sh \
-  --domain example.com \
+  --domain parolemutanti.maxster.top \
   --port 8090 \
-  --tls-cert /etc/caddy/certs/example.com.crt \
-  --tls-key /etc/caddy/certs/example.com.key
+  --tls-cert /etc/caddy/certs/parolemutanti.maxster.top.crt \
+  --tls-key /etc/caddy/certs/parolemutanti.maxster.top.key
 ```
 
 ### Durante il deploy
@@ -49,10 +57,14 @@ sudo ./deploy/deploy.sh \
 - `--caddy` aggiunge `import /etc/caddy/sites/*.conf` al Caddyfile principale
   (solo se non già presente) e ricarica Caddy.
 
+> **Porta**: in bare-metal la porta canonica è **8090** (la 8081 è quella dello
+> stack Docker). Le due strade non vanno fatte convivere sulla stessa porta:
+> usa Docker **oppure** il bare-metal.
+
 ## 🧪 Verifica
 
 ```bash
-curl https://example.com/health
+curl https://parolemutanti.maxster.top/health
 systemctl status parole-mutanti
 ```
 
@@ -61,8 +73,8 @@ systemctl status parole-mutanti
 ## 🔁 Aggiornamenti
 
 ```bash
-cd /home/<user>/paroleMutanti_prod   # (o dove hai clonato)
-sudo ./deploy/deploy.sh --update            # git pull (clone) + rsync + npm + schema idempotente + restart
+cd /srv/apps/parolemutanti              # il clone (non /opt/paroleMutanti)
+sudo ./deploy/deploy.sh --update        # git pull (clone) + rsync + npm + schema idempotente + restart
 ```
 
 > `--update` esegue, in ordine: `git pull --ff-only` nella **directory corrente** (il clone),
@@ -86,6 +98,9 @@ sudo ./deploy/deploy.sh --update            # git pull (clone) + rsync + npm + s
   ```
 
 - Verifica: `node --version` e `curl http://127.0.0.1:8090/health`.
+
+> **Con Docker non serve nulla di tutto questo**: l'immagine fissa Node
+> `node:24-alpine` (vedi `deploy/Dockerfile`).
 
 ## 💾 Backup
 - Installato **automaticamente** al deploy (cron ogni notte alle 3:00).

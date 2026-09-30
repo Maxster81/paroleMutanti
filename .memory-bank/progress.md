@@ -11,6 +11,7 @@
 | M4 — Frontend Base | ✅ | SPA + CSS + JS, views home/create/join/lobby/game/end |
 | M5 — Gioco Realtime | ✅ | game view, end view, home lista, modello round/turno/limbo + bugfix |
 | M6 — Deploy | ✅ | live in produzione (1.2.9+), Caddy TLS, systemd, backup, test 08 |
+| **M7 — Dockerizzazione** | ✅ | **deploy primario = Docker Compose** (app + PostgreSQL), dizionario cotto in build, fine del modello a due repository, porta 8081, `docs/DEPLOY.md` |
 
 ## 📊 Overall Status
 - **Milestone 1 (Setup & DB)**: ✅ **COMPLETATA**
@@ -19,7 +20,8 @@
 - **Milestone 4b (Dizionario Ibrido)**: ✅ **COMPLETATA**
 - **Milestone 4 (Frontend Base)**: ✅ **COMPLETATA** (home, crea, unisciti, lobby, game, end)
 - **Milestone 5 (Gioco Realtime)**: ✅ **COMPLETATA** (game view rifinita, end view, home lista auto-aggiornata, animazioni CSS, feedback AI)
-- **Milestone 6 (Deploy)**: ✅ **COMPLETATA** (live su `parolemutanti.maxster.top`, Caddy TLS + systemd + backup; aggiornamenti in-place via `deploy.sh --update` fino a 1.3.3)
+- **Milestone 6 (Deploy)**: ✅ **COMPLETATA, STORICA** (live su `parolemutanti.maxster.top` con systemd + Caddy fino a 1.5.0; percorso ora sostituito da M7)
+- **Milestone 7 (Dockerizzazione)**: ✅ **COMPLETATA lato repo** — verifica sul server a cura dell'utente (`docs/DEPLOY.md`). Vedi `.memory-bank/M7-docker-migration.md`
 
 ## ✅ Cosa Funziona (Done)
 
@@ -111,11 +113,8 @@
 
 ### M6 (Deploy)
 - [x] `deploy/deploy.sh` creato (flag-based: `--install/--env/--service/--caddy/--update`, `--domain/--port/--dir/--env-file`)
-- [x] `deploy/Caddyfile.prod.snippet` → template (`__DOMAIN__` / `__PORT__`, no riferimenti personali)
 - [x] `deploy/parole-mutanti.service` pulito (niente `Documentation` personale; note su PORT/HOST)
-- [x] `sync-to-prod.sh` (whitelist rsync dev→prod, marker `.last-sync-dev-commit`, `--dry-run`)
 - [x] `VERSION` = `1.0.0` (SemVer attivato post-M5; `package.json` allineato)
-- [x] Repo pubblico `paroleMutanti_prod` creato, popolato e **pushato** (niente rules/memory-bank/tests/ref personali)
 - [x] `backend/src/config.js`: default `HOST=127.0.0.1` quando `NODE_ENV=production`
 - [x] Caddy integrato via `import` modulare: `deploy.sh --caddy` scrive `/etc/caddy/sites/parole-mutanti.conf` (da template), aggiunge `import /etc/caddy/sites/*.conf` al Caddyfile se assente, valida e ricarica. Supporto `--tls-cert/--tls-key` (certificati esistenti, come `efftrack`) o Let's Encrypt automatico. HSTS senza `includeSubDomains`.
 - [x] `deploy/backup.sh` (pg_dump + gzip + rotazione 7) + cron automatico installato da `deploy.sh` nel deploy completo (ogni notte alle 3:00)
@@ -123,6 +122,32 @@
 - [x] Home: "📖 Come si gioca" aggiornata (3 fasi, non ripetere parole, pareggio) e resa sezione apribile (accordion con freccina ▸, `aria-expanded`, chiusa di default)
 - [x] Fix deploy.sh: DB setup spostato in un passo `--db` DOPO `--env` (DATABASE_URL prima generata automaticamente); password DB generata nel shell e passata a setup-user.sql via `-v db_password` (psql \if/\set); niente più copia manuale password
 - [x] Deploy reale su server (Caddy TLS, DNS, test produzione) — live dal 1.2.9, aggiornato fino a 1.3.3
+### M7 (Dockerizzazione) — ✅ completata lato repo
+- [x] **Dismesso il modello a due repository**: `sync-to-prod.sh` eliminato; rimossi i
+  riferimenti al repo di produzione da `README.md`, `deploy/README.md`, `.clinerules/*`,
+  `.memory-bank/*`; rimosso `.last-sync-dev-commit` da `.gitignore`
+- [x] `deploy/Dockerfile` multi-stage (node:24-alpine; builder con `npm ci --omit=dev` +
+  artefatto dizionario; runtime con dumb-init, utente non root uid 10001, healthcheck)
+- [x] `.dockerignore` completo (segreti, `.git`, `node_modules`, `.clinerules/`,
+  `.memory-bank/`, `docs/`, test, `e2e/`, file bare-metal)
+- [x] `docker-compose.yml` (root): app + db (postgres:16-alpine), volume nominato,
+  `restart: unless-stopped`, `init: true`, `env_file`, `depends_on: service_healthy`,
+  healthcheck, logging json-file 10m×5, porta **127.0.0.1:8081**
+- [x] **Dizionario cotto in build**: `db/export-dicts.mjs` → `dict/words.tsv.gz`
+  (185.723 parole, 0,48 MB) + `db/seed-words.mjs` (import in ~2 s al primo avvio,
+  no-op se la tabella è già popolata) + `db/wait-for-db.mjs`
+- [x] `deploy/docker-entrypoint.sh`: attesa DB → schema idempotente → seed → `exec` del server
+- [x] `deploy/backup-docker.sh` (pg_dump dal container `db`, rotazione 7)
+- [x] `docs/DEPLOY.md`: architettura, primo deploy, **verifica dizionario**, aggiornamenti,
+  backup, blocco Caddy, migrazione dal vecchio systemd + lista di pulizia, troubleshooting
+- [x] `README.md` («Deploy con Docker» primario + bare-metal secondario) e
+  `deploy/README.md` (riscritto come guida bare-metal)
+- [x] `.env.example` riscritto per Docker (`POSTGRES_*`, `PORT=8081`, fail-fast) con
+  sezione bootstrap avanzata; `npm run db:export-dicts|db:seed|db:wait|db:bootstrap`
+- [x] Versione `1.5.0` → **`1.6.0`**
+- [x] **Verifica con PostgreSQL 16.14 reale** (sandbox, no Docker): schema idempotente,
+  seed 185.723 parole in 2,0 s, secondo avvio no-op, `/health` ok, frontend 200,
+  gioco e2e 11/11 (parola valida da DB `source=LO`, inventata respinta), `npm test` 64/64
 
 ### Post-M5 (opzionali / rifiniture)
 - [x] Test Playwright multi-context a 4 giocatori: 4 contesti isolati (Alice/Bob/Carlo/Diana) → stessa parola per tutti, ognuno vede i 4 giocatori, nessun conflitto localStorage
@@ -177,28 +202,36 @@ M3 (AI Integration):   [██████████] 100%  ✅ COMPLETATA
 M4b (Dizionario):      [██████████] 100%  ✅ COMPLETATA
 M4 (Frontend Base):    [██████████] 100%  ✅ COMPLETATA
 M5 (Gioco Realtime):   [██████████] 100%  ✅ COMPLETATA
-M6 (Deploy):           [██████████] 100%  ✅ COMPLETATA (live 1.2.9+)
+M6 (Deploy):           [██████████] 100%  ✅ COMPLETATA (storico, systemd)
+M7 (Docker):           [██████████] 100%  ✅ COMPLETATA lato repo (verifica server: utente)
 ```
 
 ## 🏆 Risultati per Milestone
 
-| KPI | M1 | M2 | M3 | M4b/M4b-fix |
-|---|---|---|---|---|
-| Parole nel DB | 539.780 → sostituite | - | - | 185.723 ✅ |
-| Performance query | 45.84ms ✅ | - | - | - |
-| Test unit | - | 28/28 ✅ | 28/28 ✅ | 27/27 ✅ |
-| Smoke E2E | - | PASS | PASS | PASS |
-| AI integrata | - | - | ✅ | - |
-| Latenza AI media | - | - | 343ms | 370ms |
+| KPI | M1 | M2 | M3 | M4b/M4b-fix | M7 |
+|---|---|---|---|---|---|
+| Parole nel DB | 539.780 → sostituite | - | - | 185.723 ✅ | 185.723 (cotte in immagine) ✅ |
+| Performance query | 45.84ms ✅ | - | - | - | - |
+| Test unit | - | 28/28 ✅ | 28/28 ✅ | 27/27 ✅ | 64/64 (con e2e socket) ✅ |
+| Smoke E2E | - | PASS | PASS | PASS | PASS (create→join→ready→submit) |
+| AI integrata | - | - | ✅ | - | - |
+| Latenza AI media | - | - | 343ms | 370ms | - |
 
 ## 🐛 Issue Aperte
 - **MCP filesystem**: config già aggiornata per includere `/home/death/paroleMutanti`; **serve riavvio di Cline** (o "Retry" sul banner) perché diventi effettivo.
+- **Verifica sul server (M7)**: build/`docker compose up` non eseguibili nella sandbox di
+  sviluppo → l'utente deve eseguire i passi di `docs/DEPLOY.md` §3-§4 e §9 (migrazione).
+  Punti più probabili in caso di problemi: porta 8081 già occupata,
+  `POSTGRES_PASSWORD`/`SESSION_SECRET` vuote, RAM insufficiente in build.
 
-## 🚀 Pronto per M6 (Deploy)
+## 🚀 Stato e prossimi passi
 
-Il gioco è **giocabile end-to-end**:
+Il gioco è **giocabile end-to-end** e **live in produzione**:
 - ✅ Server + Socket.io + DB + AI integrati
 - ✅ Frontend completo (home con lista auto-aggiornata, crea, unisciti, lobby, game, end)
-- ✅ Bug fix: refresh partita, submit turnista post-refresh, abbandono multi-giocatore, code-display lobby, lista partite home
-- ✅ Feedback "verifica in corso…" durante validazione AI
-- Manca: deploy in produzione (Caddy + systemd + backup + TLS)
+- ✅ Deploy **Docker Compose** (M7): app + PostgreSQL in container, dizionario cotto in
+  build e importato al primo avvio, Caddy sull'host su `127.0.0.1:8081`
+- ✅ Repo **unico**: nessun repo di produzione, nessuno script di sincronizzazione
+- ➡️ Passi a cura dell'utente: migrare il server (`docs/DEPLOY.md` §3-§4 e §9),
+  verificare il gioco, poi pulizia (systemd, `/opt/paroleMutanti`, `/etc/parole-mutanti`)
+  e archiviazione del vecchio repo di produzione

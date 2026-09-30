@@ -61,6 +61,7 @@ FROM node:24-alpine AS runtime
 # pool pg + socket). ALTERNATIVA: `init: true` nel compose / `docker run --init`
 # (usato comunque, per abbondanza: è innocuo).
 # È nel repository principale di Alpine → installazione affidabile.
+# NB: in Alpine il binario sta in /usr/bin/dumb-init (NON /sbin).
 RUN apk add --no-cache dumb-init
 
 # --- Utente non root con UID/GID FISSI ---------------------------------------
@@ -99,10 +100,11 @@ USER parolemutanti
 EXPOSE 8081
 
 # Healthcheck "docker nativo": /health risponde 503 se il DB non risponde.
-# `wget` c'è in Alpine (busybox). Il compose ridefinisce l'healthcheck con
-# start_period più generoso (il primo avvio può includere il seed del dizionario).
+# Usiamo `node -e` + fetch (Node 24 ha fetch globale) invece di curl/wget: non
+# dipendiamo da utility del base image. Il compose può ridefinirlo con uno
+# start_period più generoso (primo avvio = schema + seed dizionario).
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=180s \
-    CMD wget -q -O /dev/null http://127.0.0.1:8081/health || exit 1
+    CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8081)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-ENTRYPOINT ["/sbin/dumb-init", "--", "/app/deploy/docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/dumb-init", "--", "/app/deploy/docker-entrypoint.sh"]
 CMD ["node", "backend/src/server.js"]

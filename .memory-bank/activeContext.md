@@ -1,18 +1,34 @@
 # Active Context — Focus Corrente
 
 ## 🎯 Focus Corrente
-**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (desincronizzazione `3437de2`, **M5c anti-ripetizione + elenco parole**, **validazione a tre fasi DB+morfologia+AI**). **M6 Deploy completato e live** (`parolemutanti.maxster.top`). **Audit regola 08 eseguito (1.3.3)**: fix CORS prod, validazioni server-side mancanti, parole rimosse dai log, `broadcastAPartita` su room, `.env.example` completato; aggiunti **test di integrazione GameManager** e **test e2e socket**.
 
-**🔧 Fix critico (deploy)**: risolto il bug che bloccava l'avvio in produzione — `SESSION_SECRET < 32` era un **path-mismatch** in `backend/src/config.js` riga 52 (`cfg.sessionSecret` invece di `cfg.security.sessionSecret`). Causa: `validaConfig` leggeva dal livello sbagliato → errore SEMPRE in produzione. Fix: riga 52 → `cfg.security.sessionSecret`. Commit dev `bfecf46`, prod `6e6da3c` (sync + push fatti). **✅ Deploy riuscito**: server `/health` risponde `{"status":"ok","version":"1.2.9","database":"ok","env":"production"}` — app online, restart loop risolto.
+**🐳 M7 — Dockerizzazione COMPLETATA lato repo (2026-09-30, versione `1.6.0`)**: il
+deploy primario è **Docker Compose** (container `app` + container `postgres:16`),
+con **Caddy sull'host** → `reverse_proxy 127.0.0.1:8081`. Il modello a **due
+repository** è **dismesso** (`sync-to-prod.sh` eliminato: con Docker la selezione
+dei file la fanno `deploy/Dockerfile` + `.dockerignore`). Il dizionario delle parole
+(185.723 voci) è **cotto nell'immagine in build** (`db/export-dicts.mjs`) e importato
+al primo avvio del container (`db/seed-words.mjs`, ~2 s). Guida operativa:
+`docs/DEPLOY.md`; storia e motivazioni: `.memory-bank/M7-docker-migration.md`.
+**Verifica eseguita nel sandbox con PostgreSQL 16.14 reale**: schema idempotente,
+seed 185.723 parole in 2,0 s, secondo avvio no-op, `/health` ok, partita e2e 11/11,
+`npm test` 64/64. **Verifica sul server: a cura dell'utente** (Docker non disponibile
+in sandbox).
 
-⚠️ **Correzioni deploy (da ricordare)**:
-- `deploy.sh` è in **`deploy/deploy.sh`**, NON nella root (nella root c'è solo `sync-to-prod.sh`).
-- La modalità `--update` di `deploy/deploy.sh` è stata **CORRETTA** (commit `dd3f042`): ora fa `git pull` nel clone + rsync + npm + restart. Il bug era che faceva `git pull` in `$DEPLOY_DIR` (`/opt/paroleMutanti`) che non ha `.git`. Sul server: `cd /tmp/paroleMutanti_prod && sudo ./deploy/deploy.sh --update`.
-- Sul server il clone sorgente è in `/tmp/paroleMutanti_prod`, il runtime in `/opt/paroleMutanti`.
+**Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (desincronizzazione `3437de2`, **M5c anti-ripetizione + elenco parole**, **validazione a tre fasi DB+morfologia+AI**). **M6 Deploy completato e live** (`parolemutanti.maxster.top`, ora percorso storico). **Audit regola 08 eseguito (1.3.3)**: fix CORS prod, validazioni server-side mancanti, parole rimosse dai log, `broadcastAPartita` su room, `.env.example` completato; aggiunti **test di integrazione GameManager** e **test e2e socket**.
+
+**🔧 Fix critico (deploy, storico)**: risolto il bug che bloccava l'avvio in produzione — `SESSION_SECRET < 32` era un **path-mismatch** in `backend/src/config.js` riga 52 (`cfg.sessionSecret` invece di `cfg.security.sessionSecret`). Causa: `validaConfig` leggeva dal livello sbagliato → errore SEMPRE in produzione. Fix: riga 52 → `cfg.security.sessionSecret`. **✅ Deploy riuscito**: server `/health` risponde `{"status":"ok","version":"1.2.9","database":"ok","env":"production"}` — app online, restart loop risolto.
+
+⚠️ **Correzioni deploy (storico, percorso bare-metal)**:
+- `deploy.sh` è in **`deploy/deploy.sh`**; ora è la via **alternativa** (systemd).
+- La modalità `--update` di `deploy/deploy.sh` è stata corretta (commit `dd3f042`): fa
+  `git pull` nel clone + rsync + npm + restart (il `git pull` in `$DEPLOY_DIR` non ha `.git`).
+- Con **Docker** nulla di questo serve: `git pull && docker compose up -d --build` in
+  `/srv/apps/parolemutanti`.
 
 **🔧 Fix riconnessione socket (standby telefono)**: dopo uno standby il WebSocket cade e si riconnette con un nuovo socket.id, ma il client NON ri-sincronizzava lo stato → partita desincronizzata (click senza effetto, parole scartate, UI stantia). Causa: mancava una ri-sincronizzazione alla riconnessione. Fix (commit dev `83419ec`): in `socket.js` flag `hadConnection` per distinguere la prima connessione dalle riconnessioni; `main.js` alla riconnessione emette `request_state` (ri-registra il socket + riallinea la UI). Decisione utente: NESSUNA pausa del timer in standby (chi va in standby perde il turno), ma al riconnettersi in tempo vede tutto aggiornato.
 
-**✅ Caddy risolto**: `/var/log/caddy/parole-mutanti.log` era `root:root 600` (creato da deploy vecchio) → reload Caddy falliva con `permission denied`. Fix: rieseguire `sudo ./deploy/deploy.sh --caddy --domain parolemutanti.maxster.top --port 8090` (do_caddy fa `chown caddy:caddy` + `chmod 644`), poi `systemctl restart caddy`. Sito `https://parolemutanti.maxster.top/health` → 200 via Caddy→Express. Nota: `--install` NON tocca Caddy; dopo un sync di `deploy.sh` va rieseguito `--caddy`. Sul server gira anche un'altra app (efftrack) sulla stessa istanza Caddy.
+**✅ Caddy risolto (storico, percorso bare-metal)**: `/var/log/caddy/parole-mutanti.log` era `root:root 600` (creato da deploy vecchio) → reload Caddy falliva con `permission denied`. Fix: rieseguire `sudo ./deploy/deploy.sh --caddy --domain parolemutanti.maxster.top --port 8090` (do_caddy fa `chown caddy:caddy` + `chmod 644`), poi `systemctl restart caddy`. Con Docker il blocco Caddy si scrive a mano (`docs/DEPLOY.md` §8) e non c'è nessun log file dedicato da sistemare. Sul server gira anche un'altra app sulla stessa istanza Caddy.
 
 ## ✅ Cosa è stato fatto (riepilogo cronologico)
 
@@ -130,8 +146,18 @@
 
 ## 📍 Decisioni attive
 - **Regole di gioco (revisionate, IMPLEMENTATE)**: `regole-gioco.md` è la fonte di verità. **Refactoring nomenclatura fatto**: nel backend l'oggetto in RAM è `match` (`this.matches`, metodi `creaMatch`/`avviaMatch`/`getMatch`/`listaMatchAperti`/`rimuoviMatch`), mentre **eventi wire e UI restano `partita`** (`partita_avviata/finita/cancellata`, chiavi ack `partita`) per non rompere il protocollo. **Test e2e browser aggiunto**: `e2e/game.spec.js` + `playwright.config.js` (+ `@playwright/test` devDep); si esegue con `npm run test:e2e:browser` (server attivo), 1 test passa (crea→join→ready→avvio→abbandono→game_over, 2 context separati). **Audit 08 completo passato con 58/58 + e2e.** **Nomenclatura ufficiale**: mano=`round`, turno=`turno`, manche=`game`, partita=`match`; accessori mossa=`move`, tentativo=`attempt`, passare=`pass`, stallo=`stalemate` (sostituisce `pareggio`). **Regole decise con l'utente**: best-of-N con `games_to_win` ora effettivo (una manche=partita a eliminazione; +1 punto; a fine manche tutti i non-abbandonati tornano; vince chi arriva a N); **3 tentativi per mano** (al 3° errore → `limbo`); il "pareggio" è solo uno **stallo** (nuova parola, nessun eliminato, la partita si chiude solo con vincitore); **abbandono definitivo** (non rientra, "si attacca al tram") + fix indice `currentRoundIndex`. **Incongruenze precedentemente annotate ora risolte per decisione.**
-- **Porta dev WSL**: 8090 (no Caddy, accesso diretto) ← confermato utente; in produzione bind `127.0.0.1` + Caddy
-- **Caddy prod**: blocco separato per `parolemutanti.maxster.top` ← predisposto in `deploy/`
+- **Deploy (M7, attuale)**: **Docker Compose** — stack app + PostgreSQL 16 in container,
+  `docker-compose.yml` nella root, `deploy/Dockerfile` multi-stage, `127.0.0.1:8081`,
+  Caddy sull'host, cartella server `/srv/apps/parolemutanti`. Dizionario cotto in build.
+  Guida `docs/DEPLOY.md`.
+- **Repo**: **UNO SOLO** (`paroleMutanti`). Nessun repo di produzione, nessuno script di
+  sync: la selezione dei file per l'immagine è in `.dockerignore`.
+- **Porta dev WSL**: 8081 (no Caddy, accesso diretto); in Docker la porta host è
+  pubblicata solo su loopback, in bare-metal bind `127.0.0.1` + Caddy
+- **Porta prod canonica (bare-metal)**: 8090 (Caddy `reverse_proxy 127.0.0.1:8090`);
+  dominio placeholder `__DOMAIN__` nel template `deploy/Caddyfile.prod.snippet`
+- **HOST**: default `127.0.0.1` quando `NODE_ENV=production` (config.js); nel container
+  il compose forza `0.0.0.0`
 - **Range parole iniziali**: 5-8 lettere ← confermato utente
 - **Audio**: Web Audio API (no file .mp3) ← confermato utente
 - **Versioning SemVer**: attivazione post-M5 ← confermato utente
@@ -139,11 +165,10 @@
 - **Logica turni/timer**: ottimistica (lockless) ← confermato utente
 - **Dizionario**: LO + HF (ridondanza, no napolux) ← confermato utente
 - **Charset**: accettate j/k/w/x/y (prestiti consolidati) ← confermato utente
-- **SemVer attivato (M6)**: `VERSION` = 1.0.0 in root; `package.json` allineato; bump obbligatorio ad ogni commit funzionale (regola .clinerules/04)
-- **Repo produzione**: `paroleMutanti_prod` (pubblico) affiancato in `../paroleMutanti_prod`; popolato via `sync-to-prod.sh` (whitelist, esclude rules/memory-bank/tests/ref personali); deploy con `deploy/deploy.sh`
-- **Caddy via `import`**: i siti stanno in `/etc/caddy/sites/*.conf`, il Caddyfile principale li include con `import`. `deploy.sh --caddy` genera `parole-mutanti.conf` dal template e lo rende idempotente. `--tls-cert/--tls-key` per riusare i certificati esistenti (come `efftrack.maxster.top`), oppure nessuno → Let's Encrypt automatico. HSTS **senza** `includeSubDomains` (dominio condiviso: l'HTTPS-only resta solo sul sito, non su tutto `*.maxster.top`).
-- **Porta prod canonica**: 8090 (Caddy `reverse_proxy 127.0.0.1:8090`); dominio placeholder `__DOMAIN__`
-- **HOST prod**: default `127.0.0.1` quando `NODE_ENV=production` (config.js)
+- **SemVer attivato (M6)**: `VERSION` allineato a `package.json` (oggi `1.6.0`); bump obbligatorio ad ogni commit funzionale (regola .clinerules/04)
+- **Caddy via `import` (bare-metal)**: i siti stanno in `/etc/caddy/sites/*.conf`, il Caddyfile principale li include con `import`. `deploy.sh --caddy` genera `parole-mutanti.conf` dal template e lo rende idempotente. `--tls-cert/--tls-key` per riusare i certificati esistenti (come `efftrack.maxster.top`), oppure nessuno → Let's Encrypt automatico. HSTS **senza** `includeSubDomains` (dominio condiviso: l'HTTPS-only resta solo sul sito, non su tutto `*.maxster.top`).
+- **Caddy (Docker)**: blocco minimo scritto a mano per `parolemutanti.maxster.top` →
+  `reverse_proxy 127.0.0.1:8081` (vedi `docs/DEPLOY.md` §8).
 
 ## 🛠️ MCP Attivi nel Progetto (6 totali)
 - ✅ **filesystem** (config aggiornata per includere `/home/death/paroleMutanti` — **serve riavvio di Cline** perché diventi effettivo)
@@ -168,4 +193,4 @@
 - Cline MCP config vive in Windows, raggiungibile da WSL via `/mnt/c/Users/death/AppData/Roaming/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 - **Dopo modifica config MCP, serve riavviare Cline** (o "Retry" sul banner di errore)
 - Il backend si avvia con `npm start` (no watch) o `npm run dev` (watch); nessun processo attivo prima del riavvio manuale
-- Health check su `http://localhost:8090/health`
+- Health check su `http://localhost:8081/health` (dev) / `docker compose exec app npm run db:check` (stack Docker)

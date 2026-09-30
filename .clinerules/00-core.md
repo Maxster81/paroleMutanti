@@ -21,5 +21,8 @@ Ogni regola in questo workspace può essere messa in discussione. Se Cline ident
 - **Stack**: Node.js 20+ (ES modules) + Express + Socket.io + PostgreSQL 16 + DeepSeek API (fallback AI).
 - **Frontend**: vanilla JS, mobile-first (360x800), niente framework pesante, Web Audio API.
 - **Auth**: NON prevista (nomi sessione-only per design).
-- **Deploy**: systemd + Caddy (HTTPS in prod, HTTP in dev).
+- **Deploy**: **Docker Compose** (container `app` + container PostgreSQL) con **Caddy
+  sull'host** come reverse proxy (HTTPS in prod). Il bare-metal con systemd è
+  l'alternativa secondaria (`deploy/README.md`). Repo unico: niente repo di produzione.
+  Guida operativa: `docs/DEPLOY.md`.
 - Ogni decisione tecnica deve privilegiare: semplicità operativa, latenza bassa, mobile UX, codice didattico/legibile.

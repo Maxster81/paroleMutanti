@@ -24,9 +24,10 @@
 .DS_Store
 
 # --- Segreti (MAI nell'immagine) ---------------------------------------------
+# Vale anche per `.env.example`: l'immagine non ne ha bisogno (la configurazione
+# arriva dall'esterno via env_file/EnvironmentFile).
 .env
 .env.*
-!.env.example
 *.pem
 *.key
 *.crt
@@ -53,6 +54,7 @@ test-results
 backend/tests
 backend/scripts
 **/*.md
+*.md
 
 # --- Artefatti locali del dizionario / dump ----------------------------------
 dict

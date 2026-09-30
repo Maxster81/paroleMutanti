@@ -28,10 +28,12 @@ Gioco multiplayer realtime (2-8 giocatori) di modifica parole italiane, mobile-f
 - **Database**: PostgreSQL 16 (pg driver, no ORM)
 - **AI**: DeepSeek API (fallback validazione)
 - **Frontend**: Vanilla JS, HTML semantico, CSS Grid/Flex, Web Audio API
-- **Deploy**: systemd + Caddy (HTTPS) su Ubuntu
+- **Deploy**: **Docker Compose** (container app + container PostgreSQL) su Ubuntu,
+  con **Caddy sull'host** come reverse proxy HTTPS. Alternativa secondaria:
+  bare-metal systemd (`deploy/README.md`). Guida: `docs/DEPLOY.md`.
 
 ## 📐 Vincoli
-- **NO Docker** (richiesto dall'utente)
+- **Docker** come tecnologia di deploy (dal M7); il bare-metal resta come alternativa
 - **NO framework pesanti** (React/Vue/Angular)
 - **NO auth** (per design)
 - **Mobile-first** (360x800 px target)
@@ -40,9 +42,11 @@ Gioco multiplayer realtime (2-8 giocatori) di modifica parole italiane, mobile-f
 - **AI fallback < 1s** (rate limit 10/min/partita)
 
 ## 📅 Roadmap (Milestone)
-- **M1**: Setup & DB ← **corrente**
-- **M2**: Backend Core (Express + Socket.io + validazione)
-- **M3**: AI Integration (DeepSeek fallback)
-- **M4**: Frontend Base (Home, Crea, Unisciti)
-- **M5**: Gioco Realtime (timer, turni, audio)
-- **M6**: Deploy (systemd + Caddy HTTPS)
+- **M1**: Setup & DB ✅
+- **M2**: Backend Core (Express + Socket.io + validazione) ✅
+- **M3**: AI Integration (DeepSeek fallback) ✅
+- **M4**: Frontend Base (Home, Crea, Unisciti) ✅
+- **M5**: Gioco Realtime (timer, turni, audio) ✅
+- **M6**: Deploy systemd + Caddy HTTPS ✅ *(storico)*
+- **M7**: **Dockerizzazione** + fine del modello a due repository ✅
+  (dettagli: `.memory-bank/M7-docker-migration.md`)
