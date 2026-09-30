@@ -1,0 +1,155 @@
+# =============================================================================
+# ci.yml — Pipeline CI per "Parole Mutanti"
+# =============================================================================
+# NOTA IMPORTANTE: questo file vive in `ci/workflows/` e NON in
+# `.github/workflows/` perché il token dell'infrastruttura usato in sviluppo non
+# ha il permesso di creare file in quella cartella. Per attivare la pipeline,
+# una volta sola (con le tue credenziali):
+#
+#   mkdir -p .github/workflows
+#   cp ci/workflows/ci.yml .github/workflows/ci.yml
+#   git add .github/workflows/ci.yml
+#   git commit -m "ci: aggiungi workflow GitHub Actions"
+#   git push
+#
+# Da quel momento parte su push/PR verso `main` e si può lanciare a mano da
+# GitHub → Actions → CI → "Run workflow".
+#
+# Cosa verifica:
+#   job `test`   → unit test (`node --test`) con Node 24
+#   job `docker` → build dell'immagine, stack Compose reale, attesa `healthy`,
+#                  /health, rigenerazione del dizionario (~185k parole),
+#                  e2e Socket.io, e2e browser (Playwright) e controllo che
+#                  l'immagine non contenga segreti né contesto di sviluppo
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1 — unit test (veloce, senza Docker)
+  # ---------------------------------------------------------------------------
+  test:
+    name: Unit test (Node 24)
+    runs-on: ubuntu-latest
+    env:
+      # I test unit non usano il DB, ma config.js valida DATABASE_URL all'avvio.
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Installa le dipendenze
+        run: npm ci
+      - name: Unit test
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # Job 2 — stack Docker vero: build, verifica DB, e2e
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Stack Docker (build + verifica DB + e2e)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Prepara il .env (come in docs/DEPLOY.md §3.2)
+        run: |
+          cp .env.example .env
+          sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
+          sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+
+      - name: Build e avvio dello stack
+        run: docker compose up -d --build
+
+      - name: Attendi che app e db siano healthy (max 5 minuti)
+        run: |
+          for i in $(seq 1 60); do
+            app=$(docker inspect --format '{{.State.Health.Status}}' parolemutanti-app 2>/dev/null || echo assente)
+            db=$(docker inspect --format '{{.State.Health.Status}}' parolemutanti-db 2>/dev/null || echo assente)
+            echo "tentativo $i: app=$app db=$db"
+            if [ "$app" = "healthy" ] && [ "$db" = "healthy" ]; then
+              echo "stack healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::stack non healthy entro il timeout"
+          docker compose ps
+          exit 1
+
+      - name: Verifica /health dell'app
+        run: |
+          curl -fsS http://127.0.0.1:8081/health | tee /tmp/health.json
+          grep -q '"status":"ok"' /tmp/health.json
+          grep -q '"database":"ok"' /tmp/health.json
+
+      - name: Verifica il dizionario nel DB (>= 180.000 parole)
+        run: |
+          docker compose exec -T app npm run db:check | tee /tmp/dbcheck.log
+          parole=$(grep -oE 'Parole totali nel dizionario: [0-9]+' /tmp/dbcheck.log | grep -oE '[0-9]+')
+          echo "parole nel DB: ${parole:-0}"
+          [ "${parole:-0}" -ge 180000 ] || { echo "::error::dizionario incompleto (${parole:-0})"; exit 1; }
+
+      - name: Verifica che l'immagine sia pulita (no segreti, no contesto dev)
+        run: |
+          docker run --rm --entrypoint sh parolemutanti:latest -c '
+            set -e
+            test ! -e /app/.env
+            test ! -e /app/.clinerules
+            test ! -e /app/.memory-bank
+            test ! -e /app/backend/tests
+            test ! -e /app/e2e
+            test -f /app/dict/words.tsv.gz
+            test -f /app/deploy/docker-entrypoint.sh
+            echo "immagine pulita, dizionario presente"
+            id
+          ' | tee /tmp/imagecheck.log
+          grep -q 'uid=10001' /tmp/imagecheck.log
+
+      - name: Installa le dipendenze host (per i test e2e)
+        run: npm ci
+
+      - name: E2E Socket.io contro lo stack
+        env:
+          E2E_URL: http://127.0.0.1:8081
+        run: node --test backend/tests/e2e-socket.test.js
+
+      - name: Installa Chromium (Playwright)
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E browser (Playwright)
+        env:
+          E2E_BASE_URL: http://127.0.0.1:8081
+        run: |
+          npx playwright test --reporter=list 2>&1 | tee /tmp/pw.log
+          # Il test si auto-salta se il server non risponde: in CI deve ESEGUIRE.
+          if grep -qi 'skipped' /tmp/pw.log; then
+            echo "::error::test browser saltato (server non raggiungibile?)"
+            exit 1
+          fi
+
+      - name: Log dello stack (in caso di errore)
+        if: failure()
+        run: docker compose logs --tail=200
+
+      - name: Ferma lo stack ed elimina il volume
+        if: always()
+        run: docker compose down -v

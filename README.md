@@ -6,10 +6,11 @@ Mobile-first, vanilla JS, Node.js + Express + Socket.io + PostgreSQL + DeepSeek 
 ## 🏗️ Architettura
 
 - **Frontend**: HTML5 + CSS3 + Vanilla JS (no framework), mobile-first 360×800px
-- **Backend**: Node.js 20+ + Express + Socket.io
+- **Backend**: Node.js 20+ + Express + Socket.io (serve anche il frontend)
 - **Database**: PostgreSQL 16
 - **AI**: DeepSeek API come fallback di validazione delle parole
-- **Deploy**: Ubuntu + Caddy (HTTPS) + systemd (vedi `deploy/`)
+- **Deploy**: Docker Compose (app + PostgreSQL) su Ubuntu, con **Caddy sull'host**
+  come reverse proxy HTTPS — guida in [`docs/DEPLOY.md`](docs/DEPLOY.md)
 
 ## 🎯 Regole del gioco
 
@@ -66,67 +67,90 @@ npm run db:check
 npm run dev
 ```
 
-## 🚀 Deploy in produzione (Ubuntu + systemd + Caddy)
+## 🐳 Deploy con Docker (primario)
 
-> La **guida passo-passo completa** è in [`deploy/README.md`](deploy/README.md)
-> (architettura, primo deploy, verifica, aggiornamenti, backup).
+Stack: container `app` (Node — serve API, Socket.io e frontend) + container `db`
+(PostgreSQL 16 con volume nominato). Caddy gira **sull'host** e inoltra a
+`127.0.0.1:8081` (loopback: il DB non pubblica porte e l'app non è esposta
+direttamente).
 
-> **Modello a due repository**: `paroleMutanti` (dev, privato) e `paroleMutanti_prod`
-> (prod, pubblico). Il sync dev→prod avviene **solo su richiesta** con `./sync-to-prod.sh`
-> (whitelist rsync), poi si committa e pusha nel repo prod. Vedi `.clinerules/04-git.md`.
-
-Sintesi essenziale:
+> Guida completa — architettura, prime installazioni, **verifica del
+> dizionario**, aggiornamenti, backup, notifiche Telegram, troubleshooting: [`docs/DEPLOY.md`](docs/DEPLOY.md)
 
 ```bash
-# 1. Clona il repo prod in una cartella a scelta (anche /tmp)
-git clone https://github.com/Maxster81/paroleMutanti_prod.git paroleMutanti_prod
-cd paroleMutanti_prod
+# Sul server (Ubuntu; Docker + plugin Compose già installati)
+sudo mkdir -p /srv/apps && cd /srv/apps
+sudo git clone https://github.com/Maxster81/paroleMutanti.git parolemutanti
+sudo chown -R "$USER":"$USER" parolemutanti
+cd parolemutanti
 
-# 2. Deploy completo (install + env + service + backup + caddy)
-sudo ./deploy/deploy.sh \
-  --domain example.com \
-  --port 8090 \
-  --tls-cert /etc/caddy/certs/example.com.crt \
-  --tls-key /etc/caddy/certs/example.com.key
+# Configurazione (le due variabili obbligatorie vengono generate qui)
+cp .env.example .env
+sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
+sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+chmod 600 .env
+
+# Build + avvio: al primo avvio il container applica lo schema e importa il
+# dizionario delle parole (~185k parole, cotto nell'immagine in build)
+docker compose up -d --build
+docker compose ps                 # app e db devono essere "healthy"
+curl -s http://127.0.0.1:8081/health
+docker compose exec app npm run db:check
 ```
 
-Il deploy genera automaticamente `DATABASE_URL` (password casuale per l'utente DB) e
-ti chiederà solo la chiave DeepSeek (opzionale); crea poi utente/DB, schema e dizionario.
+Blocco Caddy sull'host (HTTPS automatico Let's Encrypt):
 
-Verifica: `curl https://example.com/health`
+```caddyfile
+parolemutanti.maxster.top {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8081
+}
+```
 
-Aggiornamenti: `sudo ./deploy/deploy.sh --update`
-(git pull nel clone + rsync dei file in `/opt/paroleMutanti` + `npm install --production` + restart)
+Aggiornamenti: `git pull && docker compose up -d --build` (il volume del DB non
+viene toccato; lo schema è idempotente). Backup: `./deploy/backup-docker.sh`.
 
-Variabili principali (in produzione, su `/etc/parole-mutanti/.env`):
-- `NODE_ENV=production`, `HOST=127.0.0.1`, `PORT=<porta>` (default `8090`)
-- `DATABASE_URL`, `DEEPSEEK_API_KEY`, `SESSION_SECRET`
-- `CORS_ORIGIN` limitato al dominio di produzione
+## 🖥️ Deploy bare-metal (alternativa secondaria)
 
-> **Versione Node**: usare la **stessa versione** tra dev e prod (dev usa nvm v24).
-> Il pacchetto `nodejs` di apt installa la versione della distro, che può essere più
-> vecchia. In produzione allineare a v24 (vedi `deploy/README.md` → "Versione Node").
+Su un server senza Docker resta disponibile il deploy con systemd + PostgreSQL
+dell'host: [`deploy/README.md`](deploy/README.md). Anche in quel percorso la
+fonte è **questo** repository: non esiste più un repo di produzione separato né
+uno script di sincronizzazione.
 
 ## 📂 Struttura repo
 
 ```
 paroleMutanti/
-├── frontend/           # HTML/CSS/JS vanilla
+├── frontend/           # HTML/CSS/JS vanilla (serviti dal backend)
 ├── backend/            # Node.js + Express + Socket.io
 │   ├── src/
-│   │   ├── server.js   # Entry point
-│   │   ├── config.js   # Env loader
+│   │   ├── server.js   # Entry point (HTTP + Socket.io + statici)
+│   │   ├── config.js   # Env loader validato
 │   │   ├── db/         # Pool pg, query helpers
 │   │   ├── game/       # Logica: GameManager, TurnManager, Validator, morfologia
 │   │   ├── sockets/    # Handler eventi Socket.io
 │   │   ├── ai/         # Client DeepSeek + cache + rate limit
-│   │   └── utils/      # Levenshtein, normalizzazione, morfologia
+│   │   ├── telegram/   # Notifica feedback (opzionale)
+│   │   └── utils/      # Levenshtein, normalizzazione, morfologia, rate limit
 │   └── tests/          # Unit test (node --test)
 ├── db/
-│   ├── init-db.sql     # Schema tabelle
-│   ├── setup-user.sql  # Creazione user/DB
-│   └── *.mjs|*.js      # Script import/update dizionario
-├── deploy/             # deploy.sh + Caddyfile + unit systemd
+│   ├── init-db.sql     # Schema tabelle (idempotente)
+│   ├── setup-user.sql  # Utente/DB PostgreSQL (percorso bare-metal)
+│   ├── export-dicts.mjs# Artefatto dizionario per l'immagine Docker (build)
+│   ├── seed-words.mjs  # Popola `words` dall'artefatto (primo avvio container)
+│   ├── wait-for-db.mjs # Attesa di PostgreSQL all'avvio del container
+│   └── *.mjs|*.js      # Import/update/check dei dizionari
+├── deploy/
+│   ├── Dockerfile          # immagine multi-stage (Docker = deploy primario)
+│   ├── docker-entrypoint.sh# bootstrap container: attesa DB, schema, seed
+│   ├── backup-docker.sh    # backup del DB dello stack Docker
+│   ├── deploy.sh           # deploy bare-metal (alternativa, systemd)
+│   ├── parole-mutanti.service
+│   ├── Caddyfile.prod.snippet
+│   └── README.md           # guida bare-metal
+├── docker-compose.yml  # stack: app + db (build dalla root)
+├── .dockerignore       # esclude contesto di sviluppo e segreti dalla build
+├── docs/DEPLOY.md      # guida deploy Docker completa
 ├── .env.example        # Template env vars
 └── README.md
 ```
@@ -134,17 +158,37 @@ paroleMutanti/
 ## 🧪 Test
 
 ```bash
-# Unit test (Node test runner nativo, nessuna dipendenza extra)
-npm test
+# Unit test (Node test runner nativo, nessuna dipendenza extra).
+# Serve DATABASE_URL impostata: config.js la valida all'avvio anche nei test.
+DATABASE_URL=postgresql://utente:password@127.0.0.1:5432/parole_mutanti npm test
+
+# Contro lo stack Docker attivo (include i test e2e Socket.io)
+docker compose exec app env E2E_URL=http://127.0.0.1:8081 npm test
+```
+
+## 🤖 CI (GitHub Actions)
+
+Il workflow è pronto in [`ci/workflows/ci.yml`](ci/workflows/ci.yml): esegue i test
+unit e, su uno **stack Docker reale**, build + attesa `healthy` + `/health` + verifica
+del dizionario (≥ 180.000 parole) + e2e Socket.io e browser.
+
+Non è (ancora) in `.github/workflows/`: **va copiato lì una volta**, come spiegato in
+[`ci/README.md`](ci/README.md):
+
+```bash
+mkdir -p .github/workflows && cp ci/workflows/ci.yml .github/workflows/ci.yml
+git add .github/workflows/ci.yml && git commit -m "ci: aggiungi workflow GitHub Actions" && git push
 ```
 
 ## 🔐 Sicurezza
 
-- `.env` mai committato (template con placeholder in `.env.example`)
+- `.env` mai committato (template con placeholder in `.env.example`; in Docker è
+  escluso dal context della build da `.dockerignore`)
 - API key DeepSeek letta solo da `process.env`
 - Validazione input sia client che server
 - Rate limit: max 10 chiamate DeepSeek/min per partita
-- In produzione: bind `127.0.0.1` + Caddy come reverse proxy (TLS)
+- Esercizio: la porta del container è pubblicata **solo su loopback**
+  (`127.0.0.1:8081`) e il DB non pubblica porte; l'unico ingresso pubblico è Caddy (TLS)
 
 ## 📝 Licenza
 

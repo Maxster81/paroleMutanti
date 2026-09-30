@@ -20,7 +20,10 @@
 
 ## Host e Binding
 - **Sviluppo WSL**: bindare `0.0.0.0` per accessibilità da rete locale, WSL o VM.
-- Quando viene avviato il servizio, **annotare nella chat** che in produzione va rivisto il binding.
+- **Docker**: nel container `HOST` DEVE essere `0.0.0.0` (lo impone `docker-compose.yml`);
+  la porta host è pubblicata **solo su loopback** (`127.0.0.1:8081`) e Caddy sta davanti.
+- **Bare-metal**: `HOST=127.0.0.1` + Caddy come reverse proxy.
+- Quando viene avviato il servizio, **annotare nella chat** quale binding è attivo.
 
 ## Health Check
 - **Path**: `/health` (GET).

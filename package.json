@@ -1,6 +1,6 @@
 {
   "name": "parole-mutanti",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Gioco multiplayer realtime di modifica parole italiane",
   "type": "module",
   "main": "backend/src/server.js",
@@ -14,6 +14,10 @@
     "db:init": "node db/init-db.js",
     "db:reset": "node db/reset-db.js",
     "db:check": "node db/check-db.js",
+    "db:export-dicts": "node db/export-dicts.mjs",
+    "db:seed": "node db/seed-words.mjs",
+    "db:wait": "node db/wait-for-db.mjs",
+    "db:bootstrap": "node db/wait-for-db.mjs && node db/init-db.js && node db/seed-words.mjs",
     "db:import:lo": "node db/import-lo-dict.mjs",
     "db:import:hf": "node db/import-hf-dict.mjs",
     "db:import": "npm run db:import:lo && npm run db:import:hf",

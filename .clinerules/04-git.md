@@ -1,29 +1,27 @@
 # 04 — Git & Version Control Rules
 
-## Modello a Due Repository (Dev + Prod)
+## Repository Unico (Docker come deploy)
 
-Il progetto usa **due repository Git separati** (workflow tipo efftrack):
+Il progetto usa **UN SOLO repository**: `paroleMutanti` (privato, branch `main`).
+Il vecchio modello a due repository (sviluppo + `paroleMutanti_prod` con script di
+sincronizzazione `sync-to-prod.sh`) è stato **dismesso in M7** insieme al passaggio
+a Docker: con Docker la separazione tra codice di sviluppo e artefatto di deploy
+la fanno `deploy/Dockerfile` + `.dockerignore` (nell'immagine entra solo ciò che
+serve a runtime). Dettagli del passaggio: `.memory-bank/M7-docker-migration.md`.
 
-| Repository | Ruolo | Visibilità | Branch principale |
-|---|---|---|---|
-| `paroleMutanti` | Sviluppo | Privato | `main` |
-| `paroleMutanti_prod` | Produzione (deploy) | Pubblico | `main` |
-
-### Flusso di sync dev → prod
-1. Su **dev** si lavora su `main` (o branch feature/fix temporanei, poi distrutti): commit, test, debug.
-2. Quando si è a buon punto, **SOLO su richiesta esplicita dell'utente**, si esegue `./sync-to-prod.sh` (dalla root di dev):
-   - Copia SOLO i file di produzione (whitelist rsync; esclude `.clinerules`, `.memory-bank`, test, file personali).
-   - Traccia l'ultimo commit sincronizzato in `.last-sync-dev-commit` (non committato).
-   - Genera il messaggio di commit composito in `/tmp/parole-sync-msg.txt` (elenca i commit di dev).
-3. Nel repo `paroleMutanti_prod` si committa con `git commit -F /tmp/parole-sync-msg.txt` e si pusha.
-4. **Produzione** (server Ubuntu) fa `git pull` dal repo pubblico `paroleMutanti_prod` e rilancia con `deploy/deploy.sh`.
+| Flusso | Come funziona ora |
+|---|---|
+| Sviluppo | commit su `main` (o branch temporanei, poi distrutti) |
+| Deploy (Docker, **primario**) | sul server: `git pull && docker compose up -d --build` in `/srv/apps/parolemutanti` |
+| Deploy (bare-metal, alternativa) | sul server: `git pull` nel clone + `sudo ./deploy/deploy.sh --update` |
 
 ### Regole operative
-- **Commit su `main` (dev)**: LIBERI, NON richiedono l'approvazione dell'utente (regola aggiornata).
-- **Sync dev → prod e PUSH verso la produzione**: SEMPRE richiedono l'approvazione esplicita dell'utente
-  (il push verso `paroleMutanti_prod` / deploy va fatto solo su richiesta).
-- La sync è una whitelist di file: se si aggiunge una cartella root di produzione, aggiungere una riga `--include='cartella/'` e `--include='cartella/***'` in `sync-to-prod.sh`.
-- Commit su dev con Conventional Commits in italiano (vedi sotto).
+- **Commit su `main`**: LIBERI, NON richiedono l'approvazione dell'utente.
+- **Push/deploy verso la PRODUZIONE** (server, `docker compose up`, `deploy.sh`):
+  SEMPRE su richiesta esplicita dell'utente.
+- **NON reintrodurre** script di sync tra repository né repo di produzione:
+  se serve escludere file dall'immagine, si aggiorna `.dockerignore`.
+- Commit con Conventional Commits in italiano (vedi sotto).
 
 ## Branching
 
@@ -36,8 +34,10 @@ Il progetto usa **due repository Git separati** (workflow tipo efftrack):
 ### Regola operativa
 Se Cline sta lavorando su un branch di feature/fix:
 1. Il **merge su `main`** avviene in autonomia, senza chiedere conferma.
-2. Il **push verso la produzione** (`paroleMutanti_prod` / deploy) richiede SEMPRE approvazione.
+2. Il **push verso la produzione** (deploy sul server) richiede SEMPRE approvazione.
 3. **NON fare commit di file non correlati** alla feature in corso sul branch.
+4. Un branch nato per **salvare il lavoro** (es. `cline/<id>`): si pusha spesso, e
+   **mai** si pusha su `main` senza ok dell'utente.
 
 ## Commit Convention (Conventional Commits in italiano)
 Formato: `tipo(scope): descrizione`
@@ -55,22 +55,21 @@ Formato: `tipo(scope): descrizione`
 Esempi:
 - `feat(game): aggiungi logica validazione parola con Levenshtein`
 - `fix(db): correggi indice su words.length`
-- `docs(readme): aggiorna istruzioni setup PostgreSQL`
+- `docs(deploy): guida deploy Docker e migrazione dal vecchio systemd`
 
 ## Messaggi
 - **In italiano**.
 - **Descrizione breve** (max ~72 caratteri).
 - **Corpo opzionale** per dettagli aggiuntivi.
 
-## Versioning (SemVer) — Da attivare post-M5
+## Versioning (SemVer) — ATTIVO da M6
 
 - **MAJOR** — breaking changes.
-- **MINOR** — nuove funzionalità retrocompatibili.
+- **MINOR** — nuove funzionalità retrocompatibili (es. `1.6.0` = dockerizzazione).
 - **PATCH** — bug fix, refactoring.
 
-**Regola attuale**: il versioning SemVer con tag verrà **attivato quando il gioco sarà giocabile end-to-end** (stimato: post-Milestone 5). Per ora niente tag, niente `VERSION` file.
-
-Quando si attiverà:
-1. Creare `VERSION` in root.
+Regole attuali:
+1. `VERSION` in root e `package.json` devono restare **allineati**
+   (`/health` espone la versione letta da `package.json`).
 2. Bump obbligatorio ad ogni commit funzionale.
-3. Tag annotati `vX.Y.Z` su `main`.
+3. Tag annotati `vX.Y.Z` su `main` (quando si taglia una release).

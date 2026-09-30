@@ -130,8 +130,10 @@ require_node20() {
 # ============================================================
 # sync_code : copia SOLO i file di produzione dal clone in $DEPLOY_DIR
 # ============================================================
-# Whitelist rsync (stessa logica di sync-to-prod.sh). Se aggiungi una cartella
-# root di produzione, aggiungi qui la relativa riga --include.
+# NOTA: è il percorso BARE-METAL (alternativa a Docker). Con Docker questa copia
+# non serve: `deploy/Dockerfile` + `.dockerignore` selezionano i file che entrano
+# nell'immagine. Se aggiungi una cartella root di produzione, aggiungi qui la
+# relativa riga --include (e, per Docker, verifica `.dockerignore`).
 sync_code() {
     # FAIL-FAST: se la sorgente (clone da cui si lancia lo script) NON ha
     # package.json, NON eseguire rsync --delete: esso rimuoverebbe dal DEPLOY_DIR

@@ -56,7 +56,10 @@ Mappare il task contro la roadmap (vedi `progress.md`):
 - **M3**: AI Integration (DeepSeek fallback)
 - **M4**: Frontend Base (Home, Crea, Unisciti)
 - **M5**: Gioco Realtime (timer, turni, audio)
-- **M6**: Deploy (systemd + Caddy HTTPS)
+- **M6**: Deploy systemd + Caddy HTTPS *(storico, sostituito da M7)*
+- **M7**: **Dockerizzazione** — docker-compose (app + PostgreSQL), dizionario cotto
+  in build, fine del modello a due repository, deploy su `/srv/apps/parolemutanti`
+  con Caddy sull'host → `127.0.0.1:8081`
 
 Ogni task deve dichiarare:
 - in quale milestone ricade
