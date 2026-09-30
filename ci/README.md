@@ -36,3 +36,13 @@ dizionari + Playwright Chromium).
   la logica dei comandi resta valida: sono gli stessi passi di `docs/DEPLOY.md` §4.
 - Il workflow **non** esegue deploy: il deploy resta manuale e approvato
   (`git pull && docker compose up -d --build` sul server).
+
+## Se il file sorgente cambia
+
+La copia in `.github/workflows/` **non si aggiorna da sola**: dopo ogni modifica a
+`ci/workflows/ci.yml` ricopia e pusha (stesso comando dell'attivazione):
+
+```bash
+cp ci/workflows/ci.yml .github/workflows/ci.yml
+git commit -am "ci: aggiorna workflow" && git push
+```

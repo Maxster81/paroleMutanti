@@ -122,8 +122,18 @@ git branch --show-current        # verifica: deve stampare il branch atteso
 ```
 
 > Da qui in avanti `git pull` (in §7) aggiorna **il branch su cui sei**. Quando il
-> branch sarà unito a `main`, conviene passare a `main` (`git checkout main && git pull`)
-> così gli aggiornamenti seguono la linea principale.
+> branch è unito a `main`, per passare alla linea principale:
+>
+> ```bash
+> # con un clone --single-branch serve prima un fetch esplicito di main
+> # (altrimenti: error: pathspec 'main' did not match any file(s) known to git)
+> git fetch origin main:refs/remotes/origin/main
+> git checkout main && git pull
+> ```
+>
+> (Con un clone normale — senza `--single-branch` — il fetch non serve: `git checkout main`
+> trova il ramo da solo. Con `--single-branch` il repo locale conosce solo il branch
+> clonato, quindi `main` va fetchato esplicitamente prima del checkout.)
 
 ### 3.2 Genera i segreti (`.env`)
 
@@ -131,6 +141,9 @@ git branch --show-current        # verifica: deve stampare il branch atteso
 cp .env.example .env
 sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
 sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+# Se non usi il fallback AI subito (o mai), svuota anche la chiave DeepSeek:
+# il placeholder "sk-CAMBIAMI" in produzione BLOCCA l'avvio (fail-fast di config.js).
+sed -i "s|^DEEPSEEK_API_KEY=.*|DEEPSEEK_API_KEY=|" .env
 chmod 600 .env
 ```
 
