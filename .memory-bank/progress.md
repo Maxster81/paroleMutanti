@@ -309,3 +309,14 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
 ### 🧹 2026-10-12 — v1.8.1: rimosso "Tocca a: <nome>" dalla card parola (branch `fix/rimuovi-tocca-a`)
 - Ridondante dopo l'introduzione del banner di turno (e del contro-banner di attesa).
 - File: `frontend/js/views/game.js`. Bump 1.8.0 → 1.8.1.
+
+### 📝 2026-10-12 — Lezione: la regola lobby cambia l'avvio dei test e2e
+- Dopo il fix "avvio subito solo a lobby completa", una partita creata con `maxPlayers` di default (8)
+  e soli **2 giocatori pronti** NON parte subito: attende il countdown (30s). I test **e2e socket**
+  creavano la partita senza `maxPlayers` → ogni test aspettava 30s e la **CI sembrava bloccata**
+  (run da 6-9 minuti, non cancellabile lato nostro).
+- **Regola per il futuro**: nei test e2e creare le partite con `maxPlayers: 2` (lobby completa → avvio
+  immediato). Il test browser lo faceva già (`#input-max = 2`).
+- `once()` nei test e2e ha ora un **timeout** (10s): un evento atteso che non arriva fa fallire il test
+  invece di bloccare la pipeline.
+- Riferimenti: commit `bb3a8b4` / merge `ee89ce7`; tag **v1.8.1**.
