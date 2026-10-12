@@ -11,7 +11,10 @@ di "invio troppo presto". **Fix incluso**: l'avvio via timer lobby non notificav
 (nessun listener) → ora c'è un listener unico in `setupGameManagerBroadcast` (`broadcastPartitaAvviata`). **Altro fix (lobby)**: la partita partiva subito
 appena i presenti erano pronti anche con **lobby incompleta** (partita per ≥3 giocatori) → ora si parte
 subito **solo a lobby completa e pronta** (`_lobbyCompletaEPronta`); altrimenti scatta il **countdown**
-(≥2 pronti), che parte anche se non tutti i giocatori attesi sono entrati.
+(≥2 pronti), che parte anche se non tutti i giocatori attesi sono entrati. **Fix espulsione**: il giocatore
+espulso (non pronto) restava nella room e riceveva `partita_avviata` → entrava come spettatore con la partita
+bloccata; ora i suoi socket vengono staccati (`espelliSocketDelGiocatore`) prima dell'avvio, e il client ignora
+`partita_avviata` se non è tra i giocatori. Inoltre `rateLimiter` ora fa `unref()` sul cleanup interval.
 **🩹 v1.7.0 — Fix abbandono / giocatore fantasma** — tre fix: **(A)** il pulsante "abbandona" è ora sempre
 presente in partita (prima mancava sul proprio turno); **(B)** `leave_game` invia il `gameId` e il server lo
 usa come fallback, con log non silenzioso e `socket.leave` anche di `game:<id>`; **(C)** **grace timer**

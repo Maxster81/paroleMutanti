@@ -198,6 +198,13 @@ socketOn('giocatore_espulso', (data) => {
 
 socketOn('partita_avviata', (data) => {
   console.log('[main] partita_avviata', data);
+  // Difesa in profondità: se non sono tra i giocatori della partita (es. sono
+  // stato espulso dalla lobby perché non pronto) NON entro in gioco.
+  const mioNome = localStorage.getItem('pm-nome') || '';
+  if (Array.isArray(data.giocatori) && mioNome && !data.giocatori.includes(mioNome)) {
+    console.warn('[main] partita_avviata ma non sono tra i giocatori: ignorata');
+    return;
+  }
   state.update({ partita: { ...data, state: 'running' } });
   nascondiOverlay();
   // Prima della partita: schermata di "pesca" del primo giocatore (casuale).

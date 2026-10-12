@@ -12,7 +12,7 @@
 import { gameManager } from '../game/GameManager.js';
 import { logger } from '../logger.js';
 import { creaRateLimiter } from '../utils/rateLimiter.js';
-import { broadcastAPartita, registraSocketInPartita, broadcastPartitaAvviata } from './lobbyHandler.js';
+import { broadcastAPartita, registraSocketInPartita, broadcastPartitaAvviata, espelliSocketDelGiocatore } from './lobbyHandler.js';
 
 const rateLimiterSubmit = creaRateLimiter({ max: 5, windowMs: 1000 });
 
@@ -208,7 +208,11 @@ export function setupGameManagerBroadcast(io) {
     broadcastAPartita(io, data.gameId, 'lobby_timer', data);
   });
   gameManager.on('giocatore_espulso', ({ gameId, nome }) => {
+    // 1) Avvisa: l'espulso è ancora nella room, quindi riceve l'evento e torna alla home.
     broadcastAPartita(io, gameId, 'giocatore_espulso', { gameId, nome });
+    // 2) Poi lo stacca dalle room: senza questo continuava a ricevere gli eventi
+    //    (in particolare `partita_avviata`) e rientrava in partita da spettatore.
+    espelliSocketDelGiocatore(io, gameId, nome);
   });
 
   // Best-of-N (manche ↔ match)

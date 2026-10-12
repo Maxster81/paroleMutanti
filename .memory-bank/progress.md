@@ -296,3 +296,12 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
   il countdown ora dipende da `max_players >= 3` e `pronti >= 2` (non dai giocatori già entrati).
 - **Test**: 4 test unit senza DB sulla logica lobby (74 totali, 58 pass / 0 fail / 16 skip).
 - Documentato in `regole-gioco.md` §1.1 e `CHANGELOG.md` (voce 1.8.0).
+### 🐛 2026-10-12 — fix: il giocatore espulso entrava in partita come spettatore (branch `feature/primo-giocatore-casuale`)
+- **Bug**: allo scadere del timer lobby il non-pronto veniva rimosso da `match.giocatori` e riceveva
+  `giocatore_espulso`, ma il suo socket restava in `socketToGame`/room → subito dopo riceveva anche
+  `partita_avviata` ed entrava in gioco (schermata di pesca + partita bloccata, timer fermo).
+- **Fix**: nuova `espelliSocketDelGiocatore(io, gameId, nome)` in `lobbyHandler.js` (esce dalle room,
+  tolto dal tracking); chiamata dal listener `giocatore_espulso` DOPO l'avviso e PRIMA di `avviaMatch`.
+  Difesa in profondità lato client: `partita_avviata` ignorata se non sono tra i giocatori.
+- **Bonus**: `rateLimiter` ora fa `unref()` sul cleanup interval (teneva vivo il processo nei test).
+- **Test**: nuovo `backend/tests/lobbyEspulsione.test.js` (75 totali, 59 pass / 0 fail / 16 skip).

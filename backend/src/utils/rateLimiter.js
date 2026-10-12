@@ -44,6 +44,8 @@ export function creaRateLimiter(opzioni = {}) {
       }
     }
   }, cleanupIntervalMs);
+  // Il cleanup non deve tenere vivo il processo (utile per test e shutdown).
+  if (typeof interval.unref === 'function') interval.unref();
 
   /**
    * Controlla se il soggetto può fare un'altra azione.

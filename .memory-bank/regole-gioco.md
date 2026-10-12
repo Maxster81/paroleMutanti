@@ -67,6 +67,7 @@ l'inglese standard per i concetti nuovi.
   i giocatori attesi sono entrati**: non si aspetta all'infinito un giocatore che potrebbe non arrivare.
 - **Allo scadere del timer**:
   - i giocatori **non pronti** vengono **espulsi** dalla lobby (evento `giocatore_espulso` → tornano alla home);
+    i loro **socket vengono staccati** dalla partita (non ricevono gli eventi di gioco e non entrano come spettatori);
   - i giocatori **pronti** (≥2) **entrano in partita** (`avviaMatch`).
 - **Interruzioni**: se si scende **sotto 2 pronti** (un "annulla pronto") il timer si **annulla**,
   e **riparte da 30** quando la condizione si ristabilisce. Se **entra un nuovo giocatore** il timer

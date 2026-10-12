@@ -13,6 +13,10 @@ versioning [SemVer](https://semver.org/lang/it/). `VERSION` e `package.json` res
   al termine dell'animazione (`drawMs`, default 2800 ms), così nessuno perde secondi.
 
 ### Fixed
+- **Giocatore espulso che rientrava in partita**: chi non era "pronto" allo scadere del timer lobby
+  veniva rimosso dal server ma restava nella room di gioco e riceveva `partita_avviata`, entrando come
+  spettatore (schermata di pesca e partita bloccata, timer fermo). Ora i suoi socket vengono **staccati**
+  prima dell'avvio, e il client ignora `partita_avviata` se non è tra i giocatori.
 - **Avvio prematuro con lobby incompleta**: in una partita per ≥3 giocatori il gioco partiva subito
   appena i presenti erano pronti, anche se la lobby non era completa. Ora si parte subito **solo a
   lobby completa e pronta**; altrimenti parte il **countdown** (≥2 pronti), che scatta anche se non

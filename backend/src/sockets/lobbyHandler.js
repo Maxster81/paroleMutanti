@@ -192,6 +192,35 @@ export function broadcastPartitaAvviata(io, match) {
 }
 
 /**
+ * Stacca dalla partita tutti i socket di un giocatore espulso (es. non pronto
+ * allo scadere del timer lobby): esce dalle room e viene tolto dal tracking,
+ * così NON riceve più i broadcast — in particolare `partita_avviata` — e non
+ * rientra in partita da spettatore.
+ *
+ * Va chiamata DOPO aver inviato `giocatore_espulso` (che deve raggiungerlo)
+ * e PRIMA che la partita venga avviata.
+ *
+ * @param {import('socket.io').Server} io
+ * @param {string} gameId
+ * @param {string} nome
+ */
+export function espelliSocketDelGiocatore(io, gameId, nome) {
+  let staccati = 0;
+  for (const [sid, gid] of socketToGame.entries()) {
+    if (gid !== gameId) continue;
+    const s = io.sockets.sockets.get(sid);
+    if (!s || s.data?.nome !== nome) continue;
+    s.leave(`lobby:${gameId}`);
+    s.leave(`game:${gameId}`);
+    socketToGame.delete(sid);
+    gameManager.rimuoviSocket(gameId, sid);
+    staccati += 1;
+  }
+  if (staccati > 0) annullaGraceTimer(gameId, nome);
+  logger.info('socket_espulso_staccato', { gameId, nome, staccati });
+}
+
+/**
  * Costruisce un payload completo per la lobby (include tutto il necessario
  * al frontend per renderizzare la lobby senza re-fetch).
  */
