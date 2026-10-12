@@ -305,3 +305,7 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
   Difesa in profondità lato client: `partita_avviata` ignorata se non sono tra i giocatori.
 - **Bonus**: `rateLimiter` ora fa `unref()` sul cleanup interval (teneva vivo il processo nei test).
 - **Test**: nuovo `backend/tests/lobbyEspulsione.test.js` (75 totali, 59 pass / 0 fail / 16 skip).
+
+### 🧹 2026-10-12 — v1.8.1: rimosso "Tocca a: <nome>" dalla card parola (branch `fix/rimuovi-tocca-a`)
+- Ridondante dopo l'introduzione del banner di turno (e del contro-banner di attesa).
+- File: `frontend/js/views/game.js`. Bump 1.8.0 → 1.8.1.

@@ -75,9 +75,6 @@ export function renderGame(params = {}) {
         <div style="font-size: 2rem; font-weight: 700; color: var(--primary); margin: var(--spacing-sm) 0;">
           ${escapeHtml(word)}
         </div>
-        <div class="text-small">
-          Tocca a: <strong>${escapeHtml(giocatore)}</strong>${ioSonoTurnista ? ' <span class="text-dim">(tu)</span>' : ''}
-        </div>
       </div>
 
       ${ioSonoTurnista ? `
