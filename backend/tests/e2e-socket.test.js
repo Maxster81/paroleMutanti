@@ -52,7 +52,8 @@ test('e2e: crea → join → ready → avvio → abbandono → game_over', async
 
   try {
     // 1. Alice crea la partita
-    const creata = await emitAck(alice, 'create_game', { nome: 'Alice' });
+    // maxPlayers=2: lobby completa con 2 pronti → avvio immediato (niente countdown).
+    const creata = await emitAck(alice, 'create_game', { nome: 'Alice', maxPlayers: 2 });
     assert.equal(creata.ok, true, 'create_game deve avere ok=true');
     const gid = creata.partita.id;
 
@@ -91,9 +92,15 @@ test('e2e: crea → join → ready → avvio → abbandono → game_over', async
   }
 });
 
-/** Attende un singolo evento dal socket. */
-function once(socket, evento) {
-  return new Promise((resolve) => socket.once(evento, resolve));
+/**
+ * Attende un singolo evento dal socket, con timeout: senza di esso un evento
+ * che non arriva bloccherebbe il test (e la CI) all'infinito.
+ */
+function once(socket, evento, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timeout in attesa di "${evento}"`)), timeoutMs);
+    socket.once(evento, (data) => { clearTimeout(t); resolve(data); });
+  });
 }
 
 /** Risolve con `fallback` se la promise non si risolve entro timeoutMs. */
@@ -109,7 +116,8 @@ async function partitaAvviata() {
   const alice = await connect();
   const bob = await connect();
   if (!alice || !bob) return null;
-  const creata = await emitAck(alice, 'create_game', { nome: 'Alice' });
+  // maxPlayers=2: lobby completa con 2 pronti → avvio immediato (niente countdown).
+  const creata = await emitAck(alice, 'create_game', { nome: 'Alice', maxPlayers: 2 });
   const gid = creata.partita.id;
   await emitAck(bob, 'join_game', { gameId: gid, nome: 'Bob' });
   const avviate = [once(alice, 'partita_avviata'), once(bob, 'partita_avviata')];
