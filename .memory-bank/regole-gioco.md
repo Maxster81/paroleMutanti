@@ -58,10 +58,13 @@ l'inglese standard per i concetti nuovi.
 
 ## 1.1 Timer partenza lobby (anti-attese inutili)
 
-- Se in lobby ci sono **≥3 giocatori** e **≥2 in stato PRONTO ma non tutti**, e quindi non può
-  ancora partire da sola, parte un **countdown** (`LOBBY_TIMER_SECONDS`, default **30s**,
-  configurabile **solo via env**, NON mostrato nell'app).
-- **Appena tutti sono pronti** → la partita **parte subito** (senza attendere la fine del timer).
+- **Avvio immediato** solo quando la lobby è **COMPLETA** (tutti i posti di `max_players` occupati)
+  e **tutti i presenti sono pronti**. Una partita per **2 giocatori** parte subito quando entrambi
+  sono pronti (nessun countdown).
+- Se la partita è configurata per **≥3 giocatori** (`max_players`) e ci sono **≥2 pronti** ma la
+  lobby non è completa/pronta, parte un **countdown** (`LOBBY_TIMER_SECONDS`, default **30s**,
+  configurabile **solo via env**, NON mostrato nell'app). Il countdown parte **anche se non tutti
+  i giocatori attesi sono entrati**: non si aspetta all'infinito un giocatore che potrebbe non arrivare.
 - **Allo scadere del timer**:
   - i giocatori **non pronti** vengono **espulsi** dalla lobby (evento `giocatore_espulso` → tornano alla home);
   - i giocatori **pronti** (≥2) **entrano in partita** (`avviaMatch`).

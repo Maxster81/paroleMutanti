@@ -161,7 +161,8 @@ export class GameManager extends EventEmitter {
     if (typeof ready !== 'boolean') return { ok: false, errore: 'ready_non_valido' };
     match.ready[idx] = ready;
     match.lastActivityAt = new Date();
-    const tuttiProni = match.ready.every((r) => r) && match.giocatori.length >= 2;
+    // Avvio immediato SOLO a lobby completa (tutti i posti occupati) e pronta.
+    const tuttiProni = this._lobbyCompletaEPronta(match);
     // Gestione timer partenza lobby: se tutti pronti → avvio immediato
     // (lobbyHandler farà avviaMatch); altrimenti avvia/annulla/riavvia il timer
     // in base a numero di pronti e giocatori.
@@ -172,12 +173,27 @@ export class GameManager extends EventEmitter {
   }
 
   // ─── Timer partenza lobby ────────────────────────────────────────────────
-  // Regola: se giocatori >=3 e pronti >=2 ma NON tutti, parte un countdown
-  // (lobbyTimerSecondi). Allo scadere i non-pronti vengono espulsi e la partita
-  // parte con i pronti (>=2). Se tutti diventano pronti prima → avvio immediato.
+  // Regola: la partita parte SUBITO solo quando la lobby è COMPLETA (tutti i
+  // posti di `max_players` occupati) e tutti i presenti sono pronti. Altrimenti,
+  // se la partita è per >=3 giocatori e ci sono >=2 pronti, parte un countdown
+  // (lobbyTimerSecondi): allo scadere i non-pronti vengono espulsi e si parte con
+  // i pronti rimasti (>=2), anche se non si sono presentati tutti.
 
   _contaPronti(match) {
     return match.ready.filter(Boolean).length;
+  }
+
+  /**
+   * true quando la lobby è COMPLETA (tutti i posti di `max_players` occupati)
+   * e tutti i presenti sono pronti: solo allora si parte immediatamente.
+   * Con una lobby incompleta NON si parte: si attende il countdown.
+   *
+   * @param {object} match
+   * @returns {boolean}
+   */
+  _lobbyCompletaEPronta(match) {
+    return match.giocatori.length >= match.params.max_players
+      && match.ready.every((r) => r);
   }
 
   /**
@@ -191,17 +207,17 @@ export class GameManager extends EventEmitter {
       return;
     }
     const pronti = this._contaPronti(match);
-    const tutti = match.ready.every((r) => r) && match.giocatori.length >= 2;
+    const tutti = this._lobbyCompletaEPronta(match);
     if (tutti) {
       // Tutti pronti → avvio immediato: annulla l'eventuale timer.
       this._annullaTimerLobby(gameId);
       return;
     }
-    if (match.giocatori.length >= 3 && pronti >= 2) {
+    if (match.params.max_players >= 3 && pronti >= 2) {
       this._avviaTimerLobby(gameId); // (ri)parte da lobbyTimerSecondi
     } else {
-      // <2 pronti o <3 giocatori → annulla il timer (partirà di nuovo quando
-      // la condizione si ristabilisce, ripartendo da 30).
+      // <2 pronti o partita per 2 giocatori → annulla il timer (partirà di
+      // nuovo quando la condizione si ristabilisce, ripartendo da 30).
       this._annullaTimerLobby(gameId);
     }
   }

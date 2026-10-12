@@ -288,3 +288,11 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
 - **Test**: `npm test` 54 pass / 0 fail / 16 skip; test aggiornati per l'ordine non deterministico; e2e browser
   con attesa estesa per la schermata di pesca.
 - Bump 1.7.0 → **1.8.0**.
+### 🐛 2026-10-12 — fix avvio prematuro con lobby incompleta (sul branch `feature/primo-giocatore-casuale`)
+- **Bug**: in una partita per ≥3 giocatori, bastava che i **presenti** fossero pronti per far partire
+  subito il gioco (`tuttiProni = ready.every() && giocatori.length >= 2`), anche con la lobby incompleta
+  e senza countdown (il timer richiedeva `giocatori.length >= 3`).
+- **Fix**: nuovo helper `_lobbyCompletaEPronta(match)` (lobby piena + tutti pronti) per l'avvio immediato;
+  il countdown ora dipende da `max_players >= 3` e `pronti >= 2` (non dai giocatori già entrati).
+- **Test**: 4 test unit senza DB sulla logica lobby (74 totali, 58 pass / 0 fail / 16 skip).
+- Documentato in `regole-gioco.md` §1.1 e `CHANGELOG.md` (voce 1.8.0).

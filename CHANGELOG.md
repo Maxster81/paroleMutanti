@@ -13,6 +13,10 @@ versioning [SemVer](https://semver.org/lang/it/). `VERSION` e `package.json` res
   al termine dell'animazione (`drawMs`, default 2800 ms), così nessuno perde secondi.
 
 ### Fixed
+- **Avvio prematuro con lobby incompleta**: in una partita per ≥3 giocatori il gioco partiva subito
+  appena i presenti erano pronti, anche se la lobby non era completa. Ora si parte subito **solo a
+  lobby completa e pronta**; altrimenti parte il **countdown** (≥2 pronti), che scatta anche se non
+  tutti i giocatori attesi sono entrati.
 - **Avvio via timer lobby non notificava i client**: `partita_avviata` è ora inviata da un listener unico
   del GameManager, valido per entrambi i percorsi di avvio ("tutti pronti" e timer lobby).
 

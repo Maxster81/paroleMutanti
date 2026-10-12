@@ -348,3 +348,58 @@ test('sweeper: running con 0 socket e attività stantia → cancellata', async (
   assert.equal(dopo.state, 'cancelled');
 });
 
+
+// ============================================================
+// Timer partenza lobby (nessuna dipendenza dal DB)
+// Regola: la partita parte SUBITO solo se la lobby è COMPLETA (tutti i posti di
+// max_players occupati) e tutti pronti. Altrimenti, se è per >=3 giocatori e ci
+// sono >=2 pronti, parte il countdown.
+// ============================================================
+
+test('lobby 3 posti, 2 pronti → NON parte subito, parte il countdown', async () => {
+  resetGameManager();
+  const c = await gameManager.creaMatch({ creator: 'Alice', maxPlayers: 3 });
+  const gid = c.match.id;
+  gameManager.uniscitiAMatch(gid, 'Bob');
+  assert.equal(gameManager.setReady(gid, 'Alice', true).tuttiProni, false);
+  const r = gameManager.setReady(gid, 'Bob', true);
+  assert.equal(r.tuttiProni, false, 'lobby incompleta → niente avvio immediato');
+  assert.ok(gameManager.getMatch(gid).lobbyTimer, 'il countdown deve essere attivo');
+  resetGameManager();
+});
+
+test('lobby 3 posti completa e pronta → avvio immediato (nessun countdown)', async () => {
+  resetGameManager();
+  const c = await gameManager.creaMatch({ creator: 'Alice', maxPlayers: 3 });
+  const gid = c.match.id;
+  gameManager.uniscitiAMatch(gid, 'Bob');
+  gameManager.uniscitiAMatch(gid, 'Carla');
+  gameManager.setReady(gid, 'Alice', true);
+  gameManager.setReady(gid, 'Bob', true);
+  const r = gameManager.setReady(gid, 'Carla', true);
+  assert.equal(r.tuttiProni, true);
+  assert.equal(gameManager.getMatch(gid).lobbyTimer, null, 'lobby completa e pronta → avvio subito');
+  resetGameManager();
+});
+
+test('lobby 2 posti, 2 pronti → avvio immediato (nessun countdown)', async () => {
+  resetGameManager();
+  const c = await gameManager.creaMatch({ creator: 'Alice', maxPlayers: 2 });
+  const gid = c.match.id;
+  gameManager.uniscitiAMatch(gid, 'Bob');
+  gameManager.setReady(gid, 'Alice', true);
+  const r = gameManager.setReady(gid, 'Bob', true);
+  assert.equal(r.tuttiProni, true);
+  assert.equal(gameManager.getMatch(gid).lobbyTimer, null);
+  resetGameManager();
+});
+
+test('lobby 3 posti, 1 solo pronto → nessun countdown', async () => {
+  resetGameManager();
+  const c = await gameManager.creaMatch({ creator: 'Alice', maxPlayers: 3 });
+  const gid = c.match.id;
+  gameManager.uniscitiAMatch(gid, 'Bob');
+  gameManager.setReady(gid, 'Alice', true);
+  assert.equal(gameManager.getMatch(gid).lobbyTimer, null);
+  resetGameManager();
+});
