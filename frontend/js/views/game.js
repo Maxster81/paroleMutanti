@@ -54,7 +54,13 @@ export function renderGame(params = {}) {
   const giocatoriRimasti = partita.giocatori || [];
 
   return `
-    <div class="form-view game-view" style="text-align: center;">
+    <div class="form-view game-view ${ioSonoTurnista ? 'turn-mine' : 'turn-theirs'}" style="text-align: center;">
+      <div class="turn-banner ${ioSonoTurnista ? 'turn-banner--mine' : 'turn-banner--theirs'}" role="status" aria-live="polite">
+        ${ioSonoTurnista
+          ? '<span class="turn-banner__icon" aria-hidden="true">🎯</span><span class="turn-banner__text">Tocca a te!</span>'
+          : `<span class="turn-banner__icon" aria-hidden="true">⏳</span><span class="turn-banner__text">In attesa di ${escapeHtml(giocatore)}…</span>`}
+      </div>
+
       <div class="turno-counter" id="turno-counter" style="font-size: 0.95rem; font-weight: 700; color: var(--primary); margin-bottom: var(--spacing-sm); text-transform: uppercase; letter-spacing: 0.5px;">
         TURNO ${partita.turno ?? 1} · MANO ${partita.round ?? 1}/${partita.roundsTotali ?? (partita.giocatori?.length ?? 1)} · MANCHE ${manche}/${gamesToWin}
       </div>
@@ -73,14 +79,13 @@ export function renderGame(params = {}) {
       </div>
       <p class="text-small text-dim">secondi</p>
 
-      <div class="card" style="margin-top: var(--spacing-lg); text-align: left;">
+      <div class="card card-parola" id="card-parola" style="margin-top: var(--spacing-lg); text-align: left;">
         <div class="text-small text-dim">Parola corrente (l'ultima valida)</div>
         <div style="font-size: 2rem; font-weight: 700; color: var(--primary); margin: var(--spacing-sm) 0;">
           ${escapeHtml(word)}
         </div>
         <div class="text-small">
-          Tocca a: <strong>${escapeHtml(giocatore)}</strong>
-          ${ioSonoTurnista ? '<span class="badge badge-success">TU!</span>' : ''}
+          Tocca a: <strong>${escapeHtml(giocatore)}</strong>${ioSonoTurnista ? ' <span class="text-dim">(tu)</span>' : ''}
         </div>
       </div>
 
