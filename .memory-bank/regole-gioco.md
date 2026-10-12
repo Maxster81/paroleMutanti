@@ -151,8 +151,11 @@ Una mossa è accettata solo se supera **tutti** i controlli in quest'ordine:
   - se resta 1 solo giocatore → **vincitore della manche** (o fine partita se raggiunge `games_to_win`);
   - se resta 0 → partita cancellata.
 
-> **Nota**: la **disconnessione** del socket NON è trattata come abbandono durante `running` (un refresh non
-> deve far vincere l'avversario); le partite orfane vengono ripulite dal **sweeper** (auto).
+> **Nota**: la **disconnessione** del socket NON è un abbandono immediato durante `running` (un refresh non
+> deve far vincere l'avversario). Da **v1.7.0** vale però un **grace timer** (`DISCONNECT_GRACE_SECONDS`,
+> default 60s): se il giocatore non rientra entro il grace, viene trattato come **abbandono** e l'avversario
+> viene avvisato (`giocatore_eliminato` → `game_over`). Il rientro (nuovo socket + `request_state`) annulla
+> il timer. Le partite orfane (0 socket) restano comunque ripulite dallo **sweeper** (auto).
 
 ---
 

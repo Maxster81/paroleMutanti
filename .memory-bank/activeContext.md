@@ -2,29 +2,32 @@
 
 ## 🎯 Focus Corrente
 
-**🐛 v1.6.2 (branch `cline/84105wmb`)** — fix larghezza card su PC + ritocchi UI.
-Causa del bug: a ≥900px `.app-main` ha `margin: 0 auto`; essendo un flex item (body colonna)
-con margini auto sull'asse trasversale NON viene stretchato ma si dimensiona **fit-content**,
-quindi la larghezza delle card dipendeva dal contenuto (diverso tra proprio turno / attesa).
-Fix: `width: 100%` su `.app-main` nella media query ≥900px. Inoltre: card punteggio spostata
-sotto "Giocatori rimasti"; "tentativi rimasti" spostato sotto il pulsante Invia e ora si aggiorna
+**🩹 v1.7.0 — Fix abbandono / giocatore fantasma** — tre fix: **(A)** il pulsante "abbandona" è ora sempre
+presente in partita (prima mancava sul proprio turno); **(B)** `leave_game` invia il `gameId` e il server lo
+usa come fallback, con log non silenzioso e `socket.leave` anche di `game:<id>`; **(C)** **grace timer**
+anti-fantasma (`DISCONNECT_GRACE_SECONDS`, default 60s): un giocatore disconnesso in `running` viene
+trattato come abbandono se non rientra entro il grace (il rientro annulla il timer). File:
+`frontend/js/views/game.js`, `backend/src/sockets/lobbyHandler.js`, `backend/src/sockets/gameHandler.js`,
+`backend/src/config.js`, `.env.example`.
+
+**🐛 v1.6.2 — fix larghezza card su PC + ritocchi UI.** Causa del bug: a ≥900px `.app-main` ha `margin: 0 auto`;
+essendo un flex item (body colonna) con margini auto sull'asse trasversale NON viene stretchato ma si
+dimensiona **fit-content**, quindi la larghezza delle card dipendeva dal contenuto (diverso tra proprio
+turno / attesa). Fix: `width: 100%` su `.app-main` nella media query ≥900px. Inoltre: card punteggio
+spostata sotto "Giocatori rimasti"; "tentativi rimasti" spostato sotto il pulsante Invia e ora si aggiorna
 (`mossa_rifiutata` ora include `tentativi`/`maxTentativi`).
 
 **✨ Refine UI turno (2026-10-12, versione `1.6.1`) — visibilità del proprio turno**:
 segnalato che durante la partita non era chiaro a colpo d'occhio quando tocca a te
 (l'unico indizio era un badge verde `TU!` dentro la card, che si "mimetizzava" perché
 il verde `--primary` è già ovunque). Soluzione (UI, M5-refine): **banner di turno
-full-width** in cima alla game view — `🎯 Tocca a te!` su fascia verde piena con
-bagliore pulsante quando è il tuo turno; fascia neutra tratteggiata `⏳ In attesa di
-<nome>…` quando è di un altro. In più la card "Parola corrente" e il timer **si
-"accendono"** (bordo/glow `--primary`) solo col proprio turno, e il timer in attesa
-torna neutro (`--border`) — i colori di warning/danger degli ultimi secondi restano
-(selettori `:not(...)`). Segnali ridondanti (banner + card + timer) per il
-riconoscimento periferico. File: `frontend/js/views/game.js`, `frontend/css/views.css`.
-Rispetta `prefers-reduced-motion`. Aggiunta asserzione **e2e** in `e2e/game.spec.js`
-(un solo giocatore vede `.turn-banner--mine`). Verifica browser **da fare in locale**:
-il sandbox di sviluppo non ha le lib `libglib`/`libnss3` per avviare Chromium
-(niente root/apt) → screenshot non eseguibile lì; l'e2e gira in CI (job browser).
+full-width** — `🎯 Tocca a te!` su fascia verde piena con bagliore pulsante quando è il tuo
+turno; fascia neutra tratteggiata `⏳ In attesa di <nome>…` quando è di un altro. In più la card
+"Parola corrente" e il timer **si "accendono"** (bordo/glow `--primary`) solo col proprio turno, e il
+timer in attesa torna neutro (`--border`) — i colori di warning/danger degli ultimi secondi restano
+(selettori `:not(...)`). Banner posizionato **sotto il timer**, bordo card parola a **3px**. Rispetta
+`prefers-reduced-motion`. Aggiunta asserzione **e2e** in `e2e/game.spec.js` (un solo giocatore vede
+`.turn-banner--mine`). **Verifica visiva: ok** (utente, PC + mobile).
 
 **🐳 M7 — Dockerizzazione COMPLETATA lato repo (2026-09-30, versione `1.6.0`)**: il
 deploy primario è **Docker Compose** (container `app` + container `postgres:16`),

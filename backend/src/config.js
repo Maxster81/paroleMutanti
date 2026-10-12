@@ -121,6 +121,11 @@ export const config = (() => {
       // Default di visibilità di una nuova partita: pubblica (visibile in home).
       // L'utente può scegliere "privata" al momento della creazione (flag solo alla creazione).
       defaultPublic: toBool(process.env.DEFAULT_PUBLIC ?? 'true'),
+      // Anti-fantasma: se un giocatore resta disconnesso per più di N secondi
+      // mentre la partita è in corso, viene trattato come abbandono (l'avversario
+      // viene avvisato). Il rientro entro il grace annulla il timer: un refresh o
+      // uno standby breve non fa vincere l'avversario. 0 = disattivato.
+      disconnectGraceSeconds: toInt(process.env.DISCONNECT_GRACE_SECONDS, 60, 0, 600),
     },
 
     // Sicurezza

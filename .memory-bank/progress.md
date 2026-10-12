@@ -248,8 +248,7 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
 - **File**: `frontend/js/views/game.js`, `frontend/css/views.css`.
 - **Test**: `npm test` 50 pass / 0 fail / 14 skip (i 14 richiedono DB);
   asserzione e2e aggiunta in `e2e/game.spec.js` (girata dalla CI nel job browser).
-- **Da fare**: verifica visiva in locale (il sandbox non avvia Chromium: mancano
-  `libglib`/`libnss3` e non c'è root/apt).
+- **Verifica visiva**: ok (utente, PC + mobile).
 
 
 ### 🐛 2026-10-12 — v1.6.2: fix larghezza card su PC + ritocchi UI
@@ -262,3 +261,16 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
   (il broadcast `mossa_rifiutata` non includeva `tentativi`/`maxTentativi`: aggiunti nei due
   punti di emissione in `gameHandler.js`; `round_start` in `main.js` aggiorna anche i tentativi).
 - Bump 1.6.1 → **1.6.2**.
+
+### 🩹 2026-10-12 — v1.7.0: fix abbandono / giocatore fantasma (branch `fix/abbandono-partita`)
+- **A (UI)**: il pulsante "abbandona" in `frontend/js/views/game.js` è ora renderizzato SEMPRE in partita
+  (prima esisteva solo nel ramo "non è il tuo turno" → non si poteva uscire sul proprio turno).
+- **B (protocollo)**: il client invia `gameId` in `leave_game`; il server (`lobbyHandler.js`) lo usa come
+  fallback a `socketToGame`, logga i fallimenti (niente più esiti silenziosi) e lascia anche la room
+  `game:<id>` (prima lasciava solo `lobby:<id>`).
+- **C (anti-fantasma)**: grace timer su disconnect in `running` (`DISCONNECT_GRACE_SECONDS`, default 60s,
+  0=off). Se il giocatore non rientra → abbandono effettivo + notifica all'avversario; il rientro
+  (`request_state`) annulla il timer. Nuova env in `config.js` + `.env.example`.
+- **Test**: `npm test` 50 pass / 0 fail / 16 skip (i 16 richiedono DB/server); 2 nuovi test e2e socket
+  (fallback `gameId`; abbandono dopo il grace, quest'ultimo attivo solo con `DISCONNECT_GRACE_SECONDS<=15`).
+- **Verifica e merge**: ok (2026-10-12), mergiato su `main`.

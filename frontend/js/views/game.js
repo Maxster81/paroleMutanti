@@ -98,8 +98,9 @@ export function renderGame(params = {}) {
         <div class="alert alert-info" style="margin-top: var(--spacing-md);">
           Aspetta che <strong>${escapeHtml(giocatore)}</strong> faccia la sua mossa.
         </div>
-        <button class="btn btn-ghost btn-block" id="btn-leave-game">🚪 Esci (abbandona)</button>
       `}
+
+      <button class="btn btn-ghost btn-block" id="btn-leave-game" style="margin-top: var(--spacing-md);">🚪 Esci (abbandona)</button>
 
       ${paroleScritte.length > 0 ? `
         <div class="card" style="margin-top: var(--spacing-md); text-align: left;">
@@ -219,12 +220,23 @@ export function attachGameHandlers() {
   });
 
   document.getElementById('btn-leave-game')?.addEventListener('click', () => {
-    if (confirm('Vuoi abbandonare la partita?')) {
-      const partita = state.get().partita;
-      emit('leave_game', { nome: localStorage.getItem('pm-nome') || '' });
-      state.update({ gameId: null, partita: null });
-      navigate('#home');
-    }
+    if (!confirm('Vuoi abbandonare la partita?')) return;
+    audioClick();
+    const partita = state.get().partita || {};
+    // gameId esplicito: il server lo usa come fallback se la sua mappa
+    // socketId->gameId e' stantia (es. dopo una riconnessione), cosi' l'abbandono
+    // non fallisce in silenzio lasciando il giocatore 'fantasma' in partita.
+    emit('leave_game', {
+      gameId: partita.gameId || partita.id || state.get().gameId,
+      nome: localStorage.getItem('pm-nome') || '',
+    }, (resp) => {
+      if (!resp || !resp.ok) {
+        console.warn('[game] leave_game non confermato dal server:', resp);
+      }
+    });
+    localStorage.removeItem('pm-gameId');
+    state.update({ gameId: null, partita: null });
+    navigate('#home');
   });
 }
 
