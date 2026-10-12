@@ -2,6 +2,14 @@
 
 ## 🎯 Focus Corrente
 
+**🐛 v1.6.2 (branch `cline/84105wmb`)** — fix larghezza card su PC + ritocchi UI.
+Causa del bug: a ≥900px `.app-main` ha `margin: 0 auto`; essendo un flex item (body colonna)
+con margini auto sull'asse trasversale NON viene stretchato ma si dimensiona **fit-content**,
+quindi la larghezza delle card dipendeva dal contenuto (diverso tra proprio turno / attesa).
+Fix: `width: 100%` su `.app-main` nella media query ≥900px. Inoltre: card punteggio spostata
+sotto "Giocatori rimasti"; "tentativi rimasti" spostato sotto il pulsante Invia e ora si aggiorna
+(`mossa_rifiutata` ora include `tentativi`/`maxTentativi`).
+
 **✨ Refine UI turno (2026-10-12, versione `1.6.1`) — visibilità del proprio turno**:
 segnalato che durante la partita non era chiaro a colpo d'occhio quando tocca a te
 (l'unico indizio era un badge verde `TU!` dentro la card, che si "mimetizzava" perché

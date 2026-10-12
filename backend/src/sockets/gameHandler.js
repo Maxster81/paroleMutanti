@@ -85,6 +85,8 @@ export function attachGameHandlers(io, socket) {
         parola,
         motivo: risultato.motivo,
         messaggio: risultato.messaggio,
+        tentativi: risultato.tentativi,
+        maxTentativi: risultato.maxTentativi,
       });
     }
   });
@@ -140,8 +142,8 @@ export function setupGameManagerBroadcast(io) {
     logger.debug('mossa_validata_broadcast', { gameId, parola });
   });
 
-  gameManager.on('mossa_rifiutata', ({ gameId, parola, motivo, match }) => {
-    broadcastAPartita(io, gameId, 'mossa_rifiutata', { gameId, parola, motivo });
+  gameManager.on('mossa_rifiutata', ({ gameId, parola, motivo, tentativi, maxTentativi }) => {
+    broadcastAPartita(io, gameId, 'mossa_rifiutata', { gameId, parola, motivo, tentativi, maxTentativi });
   });
 
   gameManager.on('round_passato', ({ gameId, giocatore, parola, source }) => {

@@ -300,6 +300,11 @@
 
 @media (min-width: 900px) {
   .app-main {
+    /* width:100% NECESSARIO: .app-main e' un flex item (body in colonna) con
+       margin auto sull'asse trasversale -> senza width esplicita si
+       dimensiona "fit-content" e la larghezza delle card cambierebbe col
+       contenuto (bug su PC: card piu' strette quando e' il proprio turno). */
+    width: 100%;
     max-width: 720px;
     margin: 0 auto;
   }

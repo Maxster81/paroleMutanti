@@ -240,6 +240,8 @@ socketOn('round_start', (data) => {
         rounds: stato.rounds,
         giocatori: stato.giocatori || partita.giocatori,
         history: stato.history || partita.history,
+        tentativi: stato.tentativi,
+        maxTentativi: stato.maxTentativi,
       }
     });
     currentTickSecond = -1;

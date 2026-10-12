@@ -243,8 +243,22 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
 - **Fix**: banner full-width `Tocca a te!` (fascia verde + glow pulsante) / `In attesa
   di <nome>…` (fascia neutra); card "Parola corrente" e timer si accendono solo col
   proprio turno; timer neutro in attesa (warning/danger preservati via `:not`).
+- **Ritocco (12/10)**: banner spostato **sotto il timer** (sopra la card della parola);
+  bordo della card "Parola corrente" portato a **3px** quando è il proprio turno.
 - **File**: `frontend/js/views/game.js`, `frontend/css/views.css`.
 - **Test**: `npm test` 50 pass / 0 fail / 14 skip (i 14 richiedono DB);
   asserzione e2e aggiunta in `e2e/game.spec.js` (girata dalla CI nel job browser).
 - **Da fare**: verifica visiva in locale (il sandbox non avvia Chromium: mancano
   `libglib`/`libnss3` e non c'è root/apt).
+
+
+### 🐛 2026-10-12 — v1.6.2: fix larghezza card su PC + ritocchi UI
+- **Bug (solo PC)**: a ≥900px `.app-main { margin: 0 auto }`; essendo un flex item (body
+  `display:flex; flex-direction:column`) con margini auto sull'asse trasversale, NON viene
+  "stretchato" ma si dimensiona **fit-content** → la larghezza delle card dipendeva dal contenuto
+  (che cambia tra proprio turno e attesa). Fix: `width: 100%` su `.app-main` nella media query ≥900px.
+- **Card punteggio** spostata sotto "Giocatori rimasti".
+- **"Tentativi rimasti"**: spostato sotto il pulsante "Invia parola" e ora si **aggiorna**
+  (il broadcast `mossa_rifiutata` non includeva `tentativi`/`maxTentativi`: aggiunti nei due
+  punti di emissione in `gameHandler.js`; `round_start` in `main.js` aggiorna anche i tentativi).
+- Bump 1.6.1 → **1.6.2**.

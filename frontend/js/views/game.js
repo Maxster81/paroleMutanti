@@ -59,15 +59,6 @@ export function renderGame(params = {}) {
         TURNO ${partita.turno ?? 1} · MANO ${partita.round ?? 1}/${partita.roundsTotali ?? (partita.giocatori?.length ?? 1)} · MANCHE ${manche}/${gamesToWin}
       </div>
 
-      <div class="card" style="margin-top: var(--spacing-sm); text-align: left;">
-        <div class="text-small text-dim">🏅 Punteggio (manche vinte)</div>
-        <div class="text-small">
-          ${Object.entries(punteggio).length
-            ? Object.entries(punteggio).map(([n, v]) => `<span style="margin-right: 10px;">${escapeHtml(n)}: <strong>${v}</strong></span>`).join('')
-            : '<span class="text-dim">0 punti</span>'}
-        </div>
-      </div>
-
       <div class="timer-circle ${timerClass}" id="timer-circle">
         <div class="timer-text" id="timer-text">${timeLeft}</div>
       </div>
@@ -97,9 +88,9 @@ export function renderGame(params = {}) {
           <div id="submit-error" class="alert alert-error" style="display: none;"></div>
           <div id="submit-info" class="alert alert-info" style="display: none;"></div>
           <div id="verifica-box" class="alert alert-success" style="display: none;">🔎 Verifica in corso…</div>
-          <div id="tentativi-info" class="text-small text-dim" style="margin: 6px 0;">${tentativiRimasti} tentativi rimasti</div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary btn-block" id="btn-submit-word">📤 Invia parola</button>
+            <div id="tentativi-info" class="text-small text-dim" style="margin: 0;">${tentativiRimasti} tentativi rimasti</div>
             <button type="button" class="btn btn-ghost btn-block" id="btn-pass">⏭ Passa la mano</button>
           </div>
         </form>
@@ -139,6 +130,15 @@ export function renderGame(params = {}) {
           `).join('')}
         </div>
       ` : ''}
+
+      <div class="card" style="margin-top: var(--spacing-md); text-align: left;">
+        <div class="text-small text-dim">🏅 Punteggio (manche vinte)</div>
+        <div class="text-small">
+          ${Object.entries(punteggio).length
+            ? Object.entries(punteggio).map(([n, v]) => `<span style="margin-right: 10px;">${escapeHtml(n)}: <strong>${v}</strong></span>`).join('')
+            : '<span class="text-dim">0 punti</span>'}
+        </div>
+      </div>
     </div>
   `;
 }
