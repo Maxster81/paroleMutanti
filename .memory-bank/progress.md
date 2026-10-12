@@ -274,3 +274,4 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
 - **Test**: `npm test` 50 pass / 0 fail / 16 skip (i 16 richiedono DB/server); 2 nuovi test e2e socket
   (fallback `gameId`; abbandono dopo il grace, quest'ultimo attivo solo con `DISCONNECT_GRACE_SECONDS<=15`).
 - **Verifica e merge**: ok (2026-10-12), mergiato su `main`.
+- **Release**: creato `CHANGELOG.md`, tag annotato `v1.7.0` + GitHub Release.
