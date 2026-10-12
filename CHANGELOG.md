@@ -3,6 +3,12 @@
 Modifiche rilevanti del progetto. Formato ispirato a [Keep a Changelog](https://keepachangelog.com/it/1.1.0/);
 versioning [SemVer](https://semver.org/lang/it/). `VERSION` e `package.json` restano allineati.
 
+## [1.8.1] — 2026-10-12
+
+### Changed
+- Rimosso il testo **"Tocca a: <nome>"** dalla card della parola corrente: l'informazione è già
+  data dal banner di turno ("Tocca a te!") e dal contro-banner di attesa, quindi era ridondante.
+
 ## [1.8.0] — 2026-10-12
 
 ### Added

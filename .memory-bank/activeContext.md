@@ -2,6 +2,9 @@
 
 ## 🎯 Focus Corrente
 
+**🧹 v1.8.1 — rimosso "Tocca a: <nome>" dalla card della parola corrente** (ridondante: lo dice
+già il banner di turno / il contro-banner di attesa). File: `frontend/js/views/game.js`.
+
 **🎲 v1.8.0 (branch `feature/primo-giocatore-casuale`) — primo giocatore casuale + schermata di "pesca"**:
 l'ordine di gioco di ogni manche è mescolato (`ordineCasuale`, Fisher-Yates in `backend/src/utils/ordineGiocatori.js`),
 quindi non parte più sempre il creatore. All'avvio i client mostrano la view `#draw` (nuova `frontend/js/views/draw.js`)
