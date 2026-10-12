@@ -379,6 +379,7 @@
 /* Card della parola corrente: si accende col proprio turno */
 .game-view.turn-mine #card-parola {
   border-color: var(--primary);
+  border-width: 3px;
   box-shadow: 0 0 16px rgba(22, 199, 154, 0.3);
 }
 
