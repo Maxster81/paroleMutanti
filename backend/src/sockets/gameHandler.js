@@ -115,7 +115,7 @@ export function attachGameHandlers(io, socket) {
 
   // request_state
   socket.on('request_state', (payload, ack) => {
-    const { gameId } = payload || {};
+    const { gameId, nome } = payload || {};
     const match = gameId ? gameManager.getMatch(gameId) : null;
     if (!match) return ack?.({ ok: false, errore: 'partita_non_trovata' });
 
@@ -123,7 +123,7 @@ export function attachGameHandlers(io, socket) {
     // registrato nel tracking socketToGame. Senza questo ri-aggancio, i
     // broadcast (io.to(socketId)) non raggiungono più il client dopo il
     // refresh → counter fermo, mosse degli altri non visibili.
-    registraSocketInPartita(socket, gameId, match);
+    registraSocketInPartita(socket, gameId, match, nome);
 
     // M5-bugfix3: include id/gameId nello stato. Senza di essi, dopo il
     // refresh la view game invierebbe submit_word con gameId undefined

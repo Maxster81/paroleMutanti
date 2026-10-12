@@ -117,7 +117,7 @@ Transitions:
   waiting → running  (tutti ready, parola iniziale generata)
   waiting → cancelled (creator esce)
   running → finished (un solo giocatore rimasto, o raggiunto games_to_win)
-  running → cancelled (disconnessione creator + abbandono)
+  running → cancelled (abbandono di tutti / 0 socket ripuliti dallo sweeper)
 ```
 
 **Nomenclatura (best-of-N)**: mano=`round`, turno=`turno`, manche=`game`, partita=`match`.
@@ -125,6 +125,9 @@ Gerarchia: **mano** (un giocatore) → **turno** (N mani) → **manche** (vittor
 (vincitore = chi raggiunge `games_to_win`, oppure resta un solo non-abbandonato).
 Regole decise: 3 tentativi/mano (3° errore → limbo); abbandono DEFINITIVO (non rientra); lo stallo
 (ex "pareggio") non chiude nulla (solo nuova parola).
+**v1.7.0 — anti-fantasma**: la disconnessione in `running` avvia un **grace timer** (`DISCONNECT_GRACE_SECONDS`,
+default 60s); se il giocatore non rientra, viene rimosso come abbandono e l'avversario è avvisato.
+Il rientro (`request_state` con `nome`) annulla il timer.
 
 ## 🔐 Pattern di Sicurezza
 - **Validazione input** sia lato client (UX) che server (sicurezza)

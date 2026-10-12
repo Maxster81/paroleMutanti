@@ -235,3 +235,17 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
 - ➡️ Unica cosa rimessa dall’utente: cron di backup (`docs/DEPLOY.md` §7).
   Tutto il resto fatto e verificato: Caddy + partita reale, DeepSeek/Telegram attivi,
   clone server normale su main, CI attiva e verde (dettagli in M7-docker-migration.md)
+
+
+### 🩹 2026-10-12 — v1.7.0: fix abbandono / giocatore fantasma (branch `fix/abbandono-partita`)
+- **A (UI)**: il pulsante "abbandona" in `frontend/js/views/game.js` è ora renderizzato SEMPRE in partita
+  (prima esisteva solo nel ramo "non è il tuo turno" → non si poteva uscire sul proprio turno).
+- **B (protocollo)**: il client invia `gameId` in `leave_game`; il server (`lobbyHandler.js`) lo usa come
+  fallback a `socketToGame`, logga i fallimenti (niente più esiti silenziosi) e lascia anche la room
+  `game:<id>` (prima lasciava solo `lobby:<id>`).
+- **C (anti-fantasma)**: grace timer su disconnect in `running` (`DISCONNECT_GRACE_SECONDS`, default 60s,
+  0=off). Se il giocatore non rientra → abbandono effettivo + notifica all'avversario; il rientro
+  (`request_state`) annulla il timer. Nuova env in `config.js` + `.env.example`.
+- **Test**: `npm test` 50 pass / 0 fail / 16 skip (i 16 richiedono DB/server); 2 nuovi test e2e socket
+  (fallback `gameId`; abbandono dopo il grace, quest'ultimo attivo solo con `DISCONNECT_GRACE_SECONDS<=15`).
+- **Da fare**: verifica e2e su server reale + merge su `main` (in attesa di OK utente).

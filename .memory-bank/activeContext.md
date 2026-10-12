@@ -2,6 +2,14 @@
 
 ## 🎯 Focus Corrente
 
+**🩹 v1.7.0 — Fix abbandono / giocatore fantasma (branch `fix/abbandono-partita`)** — tre fix: **(A)** il pulsante "abbandona" è ora sempre
+presente in partita (prima mancava sul proprio turno); **(B)** `leave_game` invia il `gameId` e il server lo
+usa come fallback, con log non silenzioso e `socket.leave` anche di `game:<id>`; **(C)** **grace timer**
+anti-fantasma (`DISCONNECT_GRACE_SECONDS`, default 60s): un giocatore disconnesso in `running` viene
+trattato come abbandono se non rientra entro il grace (il rientro annulla il timer). File: `frontend/js/views/game.js`,
+`backend/src/sockets/lobbyHandler.js`, `backend/src/sockets/gameHandler.js`, `backend/src/config.js`, `.env.example`.
+**Verifica: da fare in locale/CI** (il sandbox non ha DB/Chromium).
+
 **🐳 M7 — Dockerizzazione COMPLETATA lato repo (2026-09-30, versione `1.6.0`)**: il
 deploy primario è **Docker Compose** (container `app` + container `postgres:16`),
 con **Caddy sull'host** → `reverse_proxy 127.0.0.1:8081`. Il modello a **due
