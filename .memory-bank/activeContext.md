@@ -2,6 +2,13 @@
 
 ## 🎯 Focus Corrente
 
+**🎲 v1.8.0 (branch `feature/primo-giocatore-casuale`) — primo giocatore casuale + schermata di "pesca"**:
+l'ordine di gioco di ogni manche è mescolato (`ordineCasuale`, Fisher-Yates in `backend/src/utils/ordineGiocatori.js`),
+quindi non parte più sempre il creatore. All'avvio i client mostrano la view `#draw` (nuova `frontend/js/views/draw.js`)
+che anima i nomi e si ferma sul primo giocatore deciso dal server (`drawMs`, default 2800 ms). Il turno sul server
+diventa attivo poco prima della fine dell'animazione (`GameManager`), così nessuno perde secondi e non c'è finestra
+di "invio troppo presto". **Fix incluso**: l'avvio via timer lobby non notificava `partita_avviata` ai client
+(nessun listener) → ora c'è un listener unico in `setupGameManagerBroadcast` (`broadcastPartitaAvviata`).
 **🩹 v1.7.0 — Fix abbandono / giocatore fantasma** — tre fix: **(A)** il pulsante "abbandona" è ora sempre
 presente in partita (prima mancava sul proprio turno); **(B)** `leave_game` invia il `gameId` e il server lo
 usa come fallback, con log non silenzioso e `socket.leave` anche di `game:<id>`; **(C)** **grace timer**

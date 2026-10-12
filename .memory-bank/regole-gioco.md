@@ -42,6 +42,10 @@ l'inglese standard per i concetti nuovi.
 - **Nessun account**: i giocatori si identificano solo con un nome **sessione-only** (1–20 caratteri, validato
   server-side). Nomi duplicati nella stessa partita non sono ammessi; un nome già presente in una partita
   `waiting` impedisce di crearne/entrarne in un'altra.
+- **Primo giocatore**: scelto **a sorte** all'inizio di ogni manche (l'ordine dei giocatori viene mescolato):
+  non è più sempre il creatore della partita. All'avvio della partita i client mostrano una breve animazione
+  di "pesca" del primo giocatore (`drawMs`, default 2800 ms); il turno sul server diventa attivo al termine
+  dell'animazione, così nessuno perde secondi.
 - **Parola iniziale**: scelta casualmente dal dizionario, con lunghezza random nell'intervallo configurato
   (default 5–8), pesata sulla disponibilità (`WordPicker.scegliParolaIniziale`).
 - **Visibilità**: ogni partita è **pubblica** (visibile nella lista della home) o **privata**

@@ -21,6 +21,7 @@ import { renderCreate, attachCreateHandlers } from './views/create.js';
 import { renderJoin, attachJoinHandlers } from './views/join.js';
 import { renderLobby, attachLobbyHandlers } from './views/lobby.js';
 import { renderGame, attachGameHandlers } from './views/game.js';
+import { renderDraw, attachDrawHandlers } from './views/draw.js';
 import { renderEnd, attachEndHandlers } from './views/end.js';
 import { renderFeedback, attachFeedbackHandlers } from './views/feedback.js';
 
@@ -117,6 +118,7 @@ route('#home', renderHome);
 route('#create', renderCreate);
 route('#join', renderJoin);
 route('#lobby', renderLobby);
+route('#draw', renderDraw);
 route('#game', renderGame);
 route('#end', renderEnd);
 route('#feedback', renderFeedback);
@@ -135,6 +137,7 @@ onRouteChange((renderFn, params) => {
     case '#create': attachCreateHandlers(); break;
     case '#join': attachJoinHandlers(); break;
     case '#lobby': attachLobbyHandlers(); break;
+    case '#draw': attachDrawHandlers(); break;
     case '#game': attachGameHandlers(); break;
     case '#end': attachEndHandlers(); break;
     case '#feedback': attachFeedbackHandlers(); break;
@@ -197,7 +200,9 @@ socketOn('partita_avviata', (data) => {
   console.log('[main] partita_avviata', data);
   state.update({ partita: { ...data, state: 'running' } });
   nascondiOverlay();
-  navigate(`#game?gameId=${data.gameId}`);
+  // Prima della partita: schermata di "pesca" del primo giocatore (casuale).
+  // Il turno sul server diventa attivo poco prima della fine dell'animazione.
+  navigate('#draw');
 });
 
 socketOn('turn_update', (data) => {

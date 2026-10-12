@@ -12,7 +12,7 @@
 import { gameManager } from '../game/GameManager.js';
 import { logger } from '../logger.js';
 import { creaRateLimiter } from '../utils/rateLimiter.js';
-import { broadcastAPartita, registraSocketInPartita } from './lobbyHandler.js';
+import { broadcastAPartita, registraSocketInPartita, broadcastPartitaAvviata } from './lobbyHandler.js';
 
 const rateLimiterSubmit = creaRateLimiter({ max: 5, windowMs: 1000 });
 
@@ -138,6 +138,13 @@ export function attachGameHandlers(io, socket) {
 }
 
 export function setupGameManagerBroadcast(io) {
+  // Avvio partita: notifica i client e li sposta nella room di gioco.
+  // Registrato QUI (una volta sola) così vale per entrambi i percorsi di
+  // avvio: "tutti pronti" (set_ready) e timer lobby (GameManager._scattaTimerLobby).
+  gameManager.on('partita_avviata', (match) => {
+    broadcastPartitaAvviata(io, match);
+  });
+
   gameManager.on('mossa_validata', ({ gameId, parola, match }) => {
     logger.debug('mossa_validata_broadcast', { gameId, parola });
   });

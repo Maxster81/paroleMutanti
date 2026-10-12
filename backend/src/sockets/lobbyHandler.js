@@ -140,6 +140,58 @@ export function broadcastAPartita(io, gameId, evento, payload) {
 }
 
 /**
+ * Costruisce il payload dell'evento `partita_avviata` (contratto col frontend).
+ * Include `drawMs`: durata dell'animazione di "pesca" del primo giocatore che il
+ * client mostra prima di entrare nella schermata di gioco.
+ *
+ * @param {object} match
+ * @returns {object}
+ */
+export function payloadPartitaAvviata(match) {
+  return {
+    gameId: match.id,
+    parolaIniziale: match.currentWord,
+    giocatoreCorrente: match.turnManager.giocatoreCorrente(),
+    timeLeft: match.turnManager.timeLeft,
+    timeLimit: match.params.turn_seconds,
+    giocatori: match.giocatori,
+    // M5c: catena di parole già usate per la UI
+    history: match.history,
+    // Best-of-N
+    manche: match.mancheCorrente,
+    gamesToWin: match.gamesToWin,
+    punteggio: match.punteggio,
+    // "Pesca" del primo giocatore
+    drawMs: match.drawMs ?? 0,
+  };
+}
+
+/**
+ * Notifica l'avvio della partita a tutti i socket della partita, spostandoli
+ * dalla room lobby a quella di gioco.
+ *
+ * Registrata come listener di `gameManager.on(partita_avviata)`, quindi vale sia
+ * per l'avvio "tutti pronti" sia per l'avvio automatico via timer lobby (prima
+ * quest'ultimo NON notificava i client, che restavano in lobby).
+ *
+ * @param {import('socket.io').Server} io
+ * @param {object} match
+ */
+export function broadcastPartitaAvviata(io, match) {
+  const gameId = match.id;
+  const payload = payloadPartitaAvviata(match);
+  for (const [sid, gid] of socketToGame.entries()) {
+    if (gid !== gameId) continue;
+    const s = io.sockets.sockets.get(sid);
+    if (!s) continue;
+    s.leave(`lobby:${gameId}`);
+    s.join(`game:${gameId}`);
+    s.emit('partita_avviata', payload);
+  }
+  logger.info('partita_avviata_broadcast', { gameId });
+}
+
+/**
  * Costruisce un payload completo per la lobby (include tutto il necessario
  * al frontend per renderizzare la lobby senza re-fetch).
  */
@@ -308,36 +360,13 @@ export function attachLobbyHandlers(io, socket) {
     // Auto-avvio se tutti pronti
     if (risultato.tuttiProni) {
       const avvio = await gameManager.avviaMatch(gameId);
-      if (avvio.ok) {
-        const match = avvio.match;
-        for (const [sid, gid] of socketToGame.entries()) {
-          if (gid === gameId) {
-            const s = io.sockets.sockets.get(sid);
-            if (s) {
-              s.leave(`lobby:${gameId}`);
-              s.join(`game:${gameId}`);
-              s.emit('partita_avviata', {
-                gameId,
-                parolaIniziale: match.currentWord,
-                giocatoreCorrente: match.turnManager.giocatoreCorrente(),
-                timeLeft: match.turnManager.timeLeft,
-                timeLimit: match.params.turn_seconds,
-                giocatori: match.giocatori,
-                // M5c: include la catena di parole già usate per la UI
-                history: match.history,
-                // Best-of-N
-                manche: match.mancheCorrente,
-                gamesToWin: match.gamesToWin,
-                punteggio: match.punteggio,
-              });
-            }
-          }
-        }
-        logger.info('partita_avviata_broadcast', { gameId });
-      } else {
+      if (!avvio.ok) {
         logger.error('avvio_automatico_fallito', { gameId, errore: avvio.errore });
         broadcastAPartita(io, gameId, 'errore', { messaggio: `Impossibile avviare: ${avvio.errore}` });
       }
+      // La notifica `partita_avviata` (e lo spostamento lobby→game room) è fatta
+      // dal listener gameManager.on('partita_avviata') → broadcastPartitaAvviata,
+      // così vale anche per l'avvio automatico via timer lobby.
     }
   });
 
