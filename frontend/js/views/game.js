@@ -54,18 +54,9 @@ export function renderGame(params = {}) {
   const giocatoriRimasti = partita.giocatori || [];
 
   return `
-    <div class="form-view game-view" style="text-align: center;">
+    <div class="form-view game-view ${ioSonoTurnista ? 'turn-mine' : 'turn-theirs'}" style="text-align: center;">
       <div class="turno-counter" id="turno-counter" style="font-size: 0.95rem; font-weight: 700; color: var(--primary); margin-bottom: var(--spacing-sm); text-transform: uppercase; letter-spacing: 0.5px;">
         TURNO ${partita.turno ?? 1} · MANO ${partita.round ?? 1}/${partita.roundsTotali ?? (partita.giocatori?.length ?? 1)} · MANCHE ${manche}/${gamesToWin}
-      </div>
-
-      <div class="card" style="margin-top: var(--spacing-sm); text-align: left;">
-        <div class="text-small text-dim">🏅 Punteggio (manche vinte)</div>
-        <div class="text-small">
-          ${Object.entries(punteggio).length
-            ? Object.entries(punteggio).map(([n, v]) => `<span style="margin-right: 10px;">${escapeHtml(n)}: <strong>${v}</strong></span>`).join('')
-            : '<span class="text-dim">0 punti</span>'}
-        </div>
       </div>
 
       <div class="timer-circle ${timerClass}" id="timer-circle">
@@ -73,14 +64,19 @@ export function renderGame(params = {}) {
       </div>
       <p class="text-small text-dim">secondi</p>
 
-      <div class="card" style="margin-top: var(--spacing-lg); text-align: left;">
+      <div class="turn-banner ${ioSonoTurnista ? 'turn-banner--mine' : 'turn-banner--theirs'}" role="status" aria-live="polite">
+        ${ioSonoTurnista
+          ? '<span class="turn-banner__icon" aria-hidden="true">🎯</span><span class="turn-banner__text">Tocca a te!</span>'
+          : `<span class="turn-banner__icon" aria-hidden="true">⏳</span><span class="turn-banner__text">In attesa di ${escapeHtml(giocatore)}…</span>`}
+      </div>
+
+      <div class="card card-parola" id="card-parola" style="margin-top: var(--spacing-lg); text-align: left;">
         <div class="text-small text-dim">Parola corrente (l'ultima valida)</div>
         <div style="font-size: 2rem; font-weight: 700; color: var(--primary); margin: var(--spacing-sm) 0;">
           ${escapeHtml(word)}
         </div>
         <div class="text-small">
-          Tocca a: <strong>${escapeHtml(giocatore)}</strong>
-          ${ioSonoTurnista ? '<span class="badge badge-success">TU!</span>' : ''}
+          Tocca a: <strong>${escapeHtml(giocatore)}</strong>${ioSonoTurnista ? ' <span class="text-dim">(tu)</span>' : ''}
         </div>
       </div>
 
@@ -92,9 +88,9 @@ export function renderGame(params = {}) {
           <div id="submit-error" class="alert alert-error" style="display: none;"></div>
           <div id="submit-info" class="alert alert-info" style="display: none;"></div>
           <div id="verifica-box" class="alert alert-success" style="display: none;">🔎 Verifica in corso…</div>
-          <div id="tentativi-info" class="text-small text-dim" style="margin: 6px 0;">${tentativiRimasti} tentativi rimasti</div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary btn-block" id="btn-submit-word">📤 Invia parola</button>
+            <div id="tentativi-info" class="text-small text-dim" style="margin: 0;">${tentativiRimasti} tentativi rimasti</div>
             <button type="button" class="btn btn-ghost btn-block" id="btn-pass">⏭ Passa la mano</button>
           </div>
         </form>
@@ -134,6 +130,15 @@ export function renderGame(params = {}) {
           `).join('')}
         </div>
       ` : ''}
+
+      <div class="card" style="margin-top: var(--spacing-md); text-align: left;">
+        <div class="text-small text-dim">🏅 Punteggio (manche vinte)</div>
+        <div class="text-small">
+          ${Object.entries(punteggio).length
+            ? Object.entries(punteggio).map(([n, v]) => `<span style="margin-right: 10px;">${escapeHtml(n)}: <strong>${v}</strong></span>`).join('')
+            : '<span class="text-dim">0 punti</span>'}
+        </div>
+      </div>
     </div>
   `;
 }

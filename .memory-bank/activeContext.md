@@ -2,6 +2,30 @@
 
 ## 🎯 Focus Corrente
 
+**🐛 v1.6.2 (branch `cline/84105wmb`)** — fix larghezza card su PC + ritocchi UI.
+Causa del bug: a ≥900px `.app-main` ha `margin: 0 auto`; essendo un flex item (body colonna)
+con margini auto sull'asse trasversale NON viene stretchato ma si dimensiona **fit-content**,
+quindi la larghezza delle card dipendeva dal contenuto (diverso tra proprio turno / attesa).
+Fix: `width: 100%` su `.app-main` nella media query ≥900px. Inoltre: card punteggio spostata
+sotto "Giocatori rimasti"; "tentativi rimasti" spostato sotto il pulsante Invia e ora si aggiorna
+(`mossa_rifiutata` ora include `tentativi`/`maxTentativi`).
+
+**✨ Refine UI turno (2026-10-12, versione `1.6.1`) — visibilità del proprio turno**:
+segnalato che durante la partita non era chiaro a colpo d'occhio quando tocca a te
+(l'unico indizio era un badge verde `TU!` dentro la card, che si "mimetizzava" perché
+il verde `--primary` è già ovunque). Soluzione (UI, M5-refine): **banner di turno
+full-width** in cima alla game view — `🎯 Tocca a te!` su fascia verde piena con
+bagliore pulsante quando è il tuo turno; fascia neutra tratteggiata `⏳ In attesa di
+<nome>…` quando è di un altro. In più la card "Parola corrente" e il timer **si
+"accendono"** (bordo/glow `--primary`) solo col proprio turno, e il timer in attesa
+torna neutro (`--border`) — i colori di warning/danger degli ultimi secondi restano
+(selettori `:not(...)`). Segnali ridondanti (banner + card + timer) per il
+riconoscimento periferico. File: `frontend/js/views/game.js`, `frontend/css/views.css`.
+Rispetta `prefers-reduced-motion`. Aggiunta asserzione **e2e** in `e2e/game.spec.js`
+(un solo giocatore vede `.turn-banner--mine`). Verifica browser **da fare in locale**:
+il sandbox di sviluppo non ha le lib `libglib`/`libnss3` per avviare Chromium
+(niente root/apt) → screenshot non eseguibile lì; l'e2e gira in CI (job browser).
+
 **🐳 M7 — Dockerizzazione COMPLETATA lato repo (2026-09-30, versione `1.6.0`)**: il
 deploy primario è **Docker Compose** (container `app` + container `postgres:16`),
 con **Caddy sull'host** → `reverse_proxy 127.0.0.1:8081`. Il modello a **due

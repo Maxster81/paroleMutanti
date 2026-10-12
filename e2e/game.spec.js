@@ -66,6 +66,23 @@ test('e2e browser: crea → join → ready → avvio → abbandono → game_over
     await expect(alice).toHaveURL(/#game/);
     await expect(bob).toHaveURL(/#game/);
 
+    // 3.b Evidenza del turno: esattamente UN giocatore vede il banner "Tocca a te!"
+    //     e l'altro vede la fascia di attesa con il nome dell'avversario.
+    await expect
+      .poll(async () =>
+        (await alice.locator('.turn-banner--mine').count()) +
+        (await bob.locator('.turn-banner--mine').count()))
+      .toBe(1);
+
+    const aliceDiTurno = (await alice.locator('.turn-banner--mine').count()) === 1;
+    if (aliceDiTurno) {
+      await expect(alice.locator('.turn-banner__text')).toHaveText(/tocca a te/i);
+      await expect(bob.locator('.turn-banner__text')).toHaveText(/in attesa di Alice/i);
+    } else {
+      await expect(bob.locator('.turn-banner__text')).toHaveText(/tocca a te/i);
+      await expect(alice.locator('.turn-banner__text')).toHaveText(/in attesa di Bob/i);
+    }
+
     // 4. Bob (non di turno) abbandona → in 2 giocatori (gamesToWin=1) Alice vince
     //    e la partita TERMINA per tutti (game_over broadcast).
     await bob.click('#btn-leave-game');
