@@ -3,6 +3,27 @@
 Modifiche rilevanti del progetto. Formato ispirato a [Keep a Changelog](https://keepachangelog.com/it/1.1.0/);
 versioning [SemVer](https://semver.org/lang/it/). `VERSION` e `package.json` restano allineati.
 
+## [1.8.0] — 2026-10-12
+
+### Added
+- **Primo giocatore casuale**: l'ordine di gioco di ogni manche è estratto a sorte (non parte più
+  sempre il creatore della partita).
+- **Schermata di "pesca" del primo giocatore**: all'avvio della partita i client mostrano una breve
+  animazione che sorteggia chi inizia (stesso risultato per tutti). Il turno sul server diventa attivo
+  al termine dell'animazione (`drawMs`, default 2800 ms), così nessuno perde secondi.
+
+### Fixed
+- **Giocatore espulso che rientrava in partita**: chi non era "pronto" allo scadere del timer lobby
+  veniva rimosso dal server ma restava nella room di gioco e riceveva `partita_avviata`, entrando come
+  spettatore (schermata di pesca e partita bloccata, timer fermo). Ora i suoi socket vengono **staccati**
+  prima dell'avvio, e il client ignora `partita_avviata` se non è tra i giocatori.
+- **Avvio prematuro con lobby incompleta**: in una partita per ≥3 giocatori il gioco partiva subito
+  appena i presenti erano pronti, anche se la lobby non era completa. Ora si parte subito **solo a
+  lobby completa e pronta**; altrimenti parte il **countdown** (≥2 pronti), che scatta anche se non
+  tutti i giocatori attesi sono entrati.
+- **Avvio via timer lobby non notificava i client**: `partita_avviata` è ora inviata da un listener unico
+  del GameManager, valido per entrambi i percorsi di avvio ("tutti pronti" e timer lobby).
+
 ## [1.7.0] — 2026-10-12
 
 ### Added

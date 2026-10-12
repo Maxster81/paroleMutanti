@@ -75,7 +75,7 @@ test('e2e: crea → join → ready → avvio → abbandono → game_over', async
     const [avvioA, avvioB] = await Promise.all(avviate);
     assert.equal(avvioA.gameId, gid);
     assert.equal(avvioB.gameId, gid);
-    assert.equal(avvioA.giocatoreCorrente, 'Alice', 'il primo turno tocca al creator');
+    assert.ok(['Alice', 'Bob'].includes(avvioA.giocatoreCorrente), 'il primo turno tocca a uno dei giocatori (ordine casuale)');
 
     // 5. Alice abbandona durante la partita → in 2 giocatori Bob vince subito
     const fineA = new Promise((r) => alice.once('game_over', r));

@@ -20,6 +20,7 @@ import { scegliParolaIniziale } from './WordPicker.js';
 import { validaMossa } from './Validator.js';
 import { TurnManager } from './TurnManager.js';
 import { normalizzaBase } from '../utils/normalizza.js';
+import { ordineCasuale } from '../utils/ordineGiocatori.js';
 
 // Intervalli sweeper (ms)
 const TIMEOUT_WAITING_MS = 5 * 60 * 1000;       // 5 min
@@ -27,12 +28,22 @@ const TIMEOUT_RUNNING_SOLO_MS = 2 * 60 * 1000;   // 2 min
 const TIMEOUT_FINISHED_MS = 60 * 1000;             // 1 min
 const SWEEPER_INTERVAL_MS = 60 * 1000;             // ogni 1 min
 
+// "Pesca" del primo giocatore: durata dell'animazione lato client (ms) prima
+// che il turno diventi attivo. 0 = nessuna attesa (turno sincrono, usato nei test).
+export const DRAW_ANIMATION_MS = 2800;
+// Il timer parte poco PRIMA della fine dell'animazione, così quando il client
+// arriva sulla schermata di gioco il turno è già attivo (nessuna finestra di errore).
+const DRAW_TIMER_ANTICIPO_MS = 300;
+
 export class GameManager extends EventEmitter {
   constructor() {
     super();
     this.matches = new Map();
     // Traccia socket connessi per match (per sweeper "running con 0 socket")
     this.socketsPerMatch = new Map(); // gameId → Set<socketId>
+
+    // Durata dell'animazione "pesca del primo giocatore" (0 = avvio sincrono).
+    this.drawAnimationMs = DRAW_ANIMATION_MS;
 
     // Sweeper automatico
     this.sweeperInterval = setInterval(() => this._sweepAbbandonate(), SWEEPER_INTERVAL_MS);
@@ -150,7 +161,8 @@ export class GameManager extends EventEmitter {
     if (typeof ready !== 'boolean') return { ok: false, errore: 'ready_non_valido' };
     match.ready[idx] = ready;
     match.lastActivityAt = new Date();
-    const tuttiProni = match.ready.every((r) => r) && match.giocatori.length >= 2;
+    // Avvio immediato SOLO a lobby completa (tutti i posti occupati) e pronta.
+    const tuttiProni = this._lobbyCompletaEPronta(match);
     // Gestione timer partenza lobby: se tutti pronti → avvio immediato
     // (lobbyHandler farà avviaMatch); altrimenti avvia/annulla/riavvia il timer
     // in base a numero di pronti e giocatori.
@@ -161,12 +173,27 @@ export class GameManager extends EventEmitter {
   }
 
   // ─── Timer partenza lobby ────────────────────────────────────────────────
-  // Regola: se giocatori >=3 e pronti >=2 ma NON tutti, parte un countdown
-  // (lobbyTimerSecondi). Allo scadere i non-pronti vengono espulsi e la partita
-  // parte con i pronti (>=2). Se tutti diventano pronti prima → avvio immediato.
+  // Regola: la partita parte SUBITO solo quando la lobby è COMPLETA (tutti i
+  // posti di `max_players` occupati) e tutti i presenti sono pronti. Altrimenti,
+  // se la partita è per >=3 giocatori e ci sono >=2 pronti, parte un countdown
+  // (lobbyTimerSecondi): allo scadere i non-pronti vengono espulsi e si parte con
+  // i pronti rimasti (>=2), anche se non si sono presentati tutti.
 
   _contaPronti(match) {
     return match.ready.filter(Boolean).length;
+  }
+
+  /**
+   * true quando la lobby è COMPLETA (tutti i posti di `max_players` occupati)
+   * e tutti i presenti sono pronti: solo allora si parte immediatamente.
+   * Con una lobby incompleta NON si parte: si attende il countdown.
+   *
+   * @param {object} match
+   * @returns {boolean}
+   */
+  _lobbyCompletaEPronta(match) {
+    return match.giocatori.length >= match.params.max_players
+      && match.ready.every((r) => r);
   }
 
   /**
@@ -180,17 +207,17 @@ export class GameManager extends EventEmitter {
       return;
     }
     const pronti = this._contaPronti(match);
-    const tutti = match.ready.every((r) => r) && match.giocatori.length >= 2;
+    const tutti = this._lobbyCompletaEPronta(match);
     if (tutti) {
       // Tutti pronti → avvio immediato: annulla l'eventuale timer.
       this._annullaTimerLobby(gameId);
       return;
     }
-    if (match.giocatori.length >= 3 && pronti >= 2) {
+    if (match.params.max_players >= 3 && pronti >= 2) {
       this._avviaTimerLobby(gameId); // (ri)parte da lobbyTimerSecondi
     } else {
-      // <2 pronti o <3 giocatori → annulla il timer (partirà di nuovo quando
-      // la condizione si ristabilisce, ripartendo da 30).
+      // <2 pronti o partita per 2 giocatori → annulla il timer (partirà di
+      // nuovo quando la condizione si ristabilisce, ripartendo da 30).
       this._annullaTimerLobby(gameId);
     }
   }
@@ -305,7 +332,10 @@ export class GameManager extends EventEmitter {
       match.startedAt = new Date();
       match.currentPlayerIndex = 0;
       // Best-of-N: giocatoriOriginali = chi può giocare le manche (tutti ora).
+      // L'elenco stabile (giocatoriOriginali) resta nell'ordine di ingresso;
+      // l'ordine di gioco della manche è invece CASUALE (non parte più il creatore).
       match.giocatoriOriginali = [...match.giocatori];
+      match.giocatori = ordineCasuale(match.giocatori);
       match.punteggio = {};
       match.mancheCorrente = 1;
       match.history = [{ parola: parolaIniziale, giocatore: '(iniziale)', turno: 0, manche: 1, timestamp: Date.now() }];
@@ -314,9 +344,21 @@ export class GameManager extends EventEmitter {
 
       const turnManager = this._creaTurnManager(gameId, match, parolaIniziale);
       match.turnManager = turnManager;
-      turnManager.start();
 
-      logger.info('partita_avviata', { gameId, parolaIniziale, gamesToWin: match.gamesToWin });
+      // Il client mostra prima l'animazione di "pesca" del primo giocatore:
+      // il turno diventa attivo solo alla fine (così nessuno perde secondi).
+      match.drawMs = this.drawAnimationMs;
+      if (match.drawMs > 0) {
+        const avvioTimer = setTimeout(() => {
+          const m = this.matches.get(gameId);
+          if (m && m.state === 'running' && m.turnManager === turnManager) turnManager.start();
+        }, Math.max(0, match.drawMs - DRAW_TIMER_ANTICIPO_MS));
+        if (typeof avvioTimer.unref === 'function') avvioTimer.unref();
+      } else {
+        turnManager.start();
+      }
+
+      logger.info('partita_avviata', { gameId, parolaIniziale, gamesToWin: match.gamesToWin, drawMs: match.drawMs });
       this.emit('partita_avviata', match);
       return { ok: true, match };
     } catch (errore) {
@@ -632,7 +674,8 @@ export class GameManager extends EventEmitter {
     );
 
     match.mancheCorrente += 1;
-    match.giocatori = [...match.giocatoriOriginali];
+    // Ogni nuova manche riparte con un ordine casuale (primo giocatore a sorte).
+    match.giocatori = ordineCasuale(match.giocatoriOriginali);
     match.currentWord = parola;
     match.paroleUsate = new Set([normalizzaBase(parola)]);
     match.history = [{ parola, giocatore: '(iniziale)', turno: 0, manche: match.mancheCorrente, timestamp: Date.now() }];

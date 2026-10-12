@@ -18,6 +18,9 @@ import { gameManager } from '../src/game/GameManager.js';
 let dbDisponibile = false;
 
 before(async () => {
+  // I test devono avere il turno attivo subito: disattiva l'attesa
+  // dell'animazione di "pesca" del primo giocatore.
+  gameManager.drawAnimationMs = 0;
   try {
     await pool.query('SELECT 1');
     dbDisponibile = true;
@@ -148,13 +151,16 @@ test('avvio partita: join + tutti pronti → running (DB)', async (t) => {
   const { partita } = await creaMatchAvviata();
   assert.equal(partita.state, 'running');
   assert.ok(partita.currentWord.length >= 3 && partita.currentWord.length <= 10);
-  assert.equal(partita.turnManager.giocatoreCorrente(), 'Alice');
+  assert.ok(partita.giocatori.includes(partita.turnManager.giocatoreCorrente()),
+    'il primo giocatore deve essere uno dei giocatori (ordine casuale)');
 });
 
 test('submitParola: giocatore non di turno → rifiutato senza toccare DB', async (t) => {
   if (!dbDisponibile) return t.skip('DB non disponibile');
-  const { gid } = await creaMatchAvviata();
-  const r = await gameManager.submitParola(gid, 'Bob', 'qualunque');
+  const { gid, partita } = await creaMatchAvviata();
+  const tm = partita.turnManager;
+  const nonDiTurno = tm.giocatori.find((g) => g !== tm.giocatoreCorrente());
+  const r = await gameManager.submitParola(gid, nonDiTurno, 'qualunque');
   assert.equal(r.valida, false);
   assert.equal(r.motivo, 'non_sei_di_turno');
 });
@@ -206,12 +212,14 @@ test('doppio passaggio di turno → pareggio, tutti restano in gioco (DB)', asyn
   const { gid, partita } = await creaMatchAvviata();
   const tm = partita.turnManager;
   const lastActivityPrima = partita.lastActivityAt;
-  // Round 1: Alice passa (limbo)
-  assert.equal(tm.giocatoreCorrente(), 'Alice');
-  assert.equal(gameManager.passaTurno(gid, 'Alice').ok, true);
-  // Round 2: Bob passa (limbo) → fine turno → pareggio
-  assert.equal(tm.giocatoreCorrente(), 'Bob');
-  assert.equal(gameManager.passaTurno(gid, 'Bob').ok, true);
+  // L'ordine dei giocatori è casuale: si usa quello reale.
+  const [primo, secondo] = tm.giocatori;
+  // Round 1: il primo passa (limbo)
+  assert.equal(tm.giocatoreCorrente(), primo);
+  assert.equal(gameManager.passaTurno(gid, primo).ok, true);
+  // Round 2: il secondo passa (limbo) → fine turno → pareggio
+  assert.equal(tm.giocatoreCorrente(), secondo);
+  assert.equal(gameManager.passaTurno(gid, secondo).ok, true);
   // _gestisciFineTurno è async (attende la nuova parola dal DB): attendi
   // che il turno sia avanzato a 2 prima di asserire.
   const dopo = await aspettaFinche(() => {
@@ -232,14 +240,15 @@ test('3 tentativi falliti nella stessa mano → limbo, si passa al successivo (D
   if (!dbDisponibile) return t.skip('DB non disponibile');
   const { partita } = await creaMatchAvviata(2);
   const tm = partita.turnManager;
-  assert.equal(tm.giocatoreCorrente(), 'Alice');
+  const primo = tm.giocatoreCorrente();
+  const secondo = tm.giocatori[(tm.giocatori.indexOf(primo) + 1) % tm.giocatori.length];
   // 3 mosse non valide (distanza != 1 dalla parola corrente).
   for (let i = 0; i < 3; i++) {
-    const r = await gameManager.submitParola(partita.id, 'Alice', 'zzzzzzz');
+    const r = await gameManager.submitParola(partita.id, primo, 'zzzzzzz');
     assert.equal(r.valida, false);
     assert.equal(r.limbo, i === 2, 'solo la 3ª mossa deve chiudere la mano in limbo');
   }
-  assert.equal(tm.giocatoreCorrente(), 'Bob', 'dopo il 3° errore tocca a Bob');
+  assert.equal(tm.giocatoreCorrente(), secondo, 'dopo il 3° errore tocca al giocatore successivo');
 });
 
 test('abbandono a 3 giocatori (non di turno) → non salta il turnista, si prosegue (DB)', async (t) => {
@@ -253,12 +262,13 @@ test('abbandono a 3 giocatori (non di turno) → non salta il turnista, si prose
   assert.equal(gameManager.setReady(gid, 'Charlie', true).ok, true);
   const avvio = await gameManager.avviaMatch(gid);
   const partita = avvio.match;
-  assert.equal(partita.turnManager.giocatoreCorrente(), 'Alice');
-  // Charlie (terzo, NON di turno) abbandona.
-  assert.equal(gameManager.abbandonaGiocatore(gid, 'Charlie').ok, true);
+  const turnista = partita.turnManager.giocatoreCorrente();
+  // Un giocatore NON di turno abbandona (l'ordine dei giocatori è casuale).
+  const altro = partita.giocatori.find((g) => g !== turnista);
+  assert.equal(gameManager.abbandonaGiocatore(gid, altro).ok, true);
   assert.equal(partita.state, 'running', 'con 2+ giocatori la partita prosegue');
   assert.equal(partita.giocatori.length, 2);
-  assert.equal(partita.turnManager.giocatoreCorrente(), 'Alice', 'il turnista non deve cambiare');
+  assert.equal(partita.turnManager.giocatoreCorrente(), turnista, 'il turnista non deve cambiare');
 });
 
 test('timer lobby: 3 giocatori, 2 pronti ma non tutti → parte il countdown (DB)', async (t) => {
@@ -338,3 +348,58 @@ test('sweeper: running con 0 socket e attività stantia → cancellata', async (
   assert.equal(dopo.state, 'cancelled');
 });
 
+
+// ============================================================
+// Timer partenza lobby (nessuna dipendenza dal DB)
+// Regola: la partita parte SUBITO solo se la lobby è COMPLETA (tutti i posti di
+// max_players occupati) e tutti pronti. Altrimenti, se è per >=3 giocatori e ci
+// sono >=2 pronti, parte il countdown.
+// ============================================================
+
+test('lobby 3 posti, 2 pronti → NON parte subito, parte il countdown', async () => {
+  resetGameManager();
+  const c = await gameManager.creaMatch({ creator: 'Alice', maxPlayers: 3 });
+  const gid = c.match.id;
+  gameManager.uniscitiAMatch(gid, 'Bob');
+  assert.equal(gameManager.setReady(gid, 'Alice', true).tuttiProni, false);
+  const r = gameManager.setReady(gid, 'Bob', true);
+  assert.equal(r.tuttiProni, false, 'lobby incompleta → niente avvio immediato');
+  assert.ok(gameManager.getMatch(gid).lobbyTimer, 'il countdown deve essere attivo');
+  resetGameManager();
+});
+
+test('lobby 3 posti completa e pronta → avvio immediato (nessun countdown)', async () => {
+  resetGameManager();
+  const c = await gameManager.creaMatch({ creator: 'Alice', maxPlayers: 3 });
+  const gid = c.match.id;
+  gameManager.uniscitiAMatch(gid, 'Bob');
+  gameManager.uniscitiAMatch(gid, 'Carla');
+  gameManager.setReady(gid, 'Alice', true);
+  gameManager.setReady(gid, 'Bob', true);
+  const r = gameManager.setReady(gid, 'Carla', true);
+  assert.equal(r.tuttiProni, true);
+  assert.equal(gameManager.getMatch(gid).lobbyTimer, null, 'lobby completa e pronta → avvio subito');
+  resetGameManager();
+});
+
+test('lobby 2 posti, 2 pronti → avvio immediato (nessun countdown)', async () => {
+  resetGameManager();
+  const c = await gameManager.creaMatch({ creator: 'Alice', maxPlayers: 2 });
+  const gid = c.match.id;
+  gameManager.uniscitiAMatch(gid, 'Bob');
+  gameManager.setReady(gid, 'Alice', true);
+  const r = gameManager.setReady(gid, 'Bob', true);
+  assert.equal(r.tuttiProni, true);
+  assert.equal(gameManager.getMatch(gid).lobbyTimer, null);
+  resetGameManager();
+});
+
+test('lobby 3 posti, 1 solo pronto → nessun countdown', async () => {
+  resetGameManager();
+  const c = await gameManager.creaMatch({ creator: 'Alice', maxPlayers: 3 });
+  const gid = c.match.id;
+  gameManager.uniscitiAMatch(gid, 'Bob');
+  gameManager.setReady(gid, 'Alice', true);
+  assert.equal(gameManager.getMatch(gid).lobbyTimer, null);
+  resetGameManager();
+});

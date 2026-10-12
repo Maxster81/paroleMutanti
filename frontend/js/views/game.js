@@ -186,7 +186,11 @@ export function attachGameHandlers() {
 
         if (!resp || !resp.ok) {
           if (errorBox) {
-            errorBox.textContent = resp?.messaggio || 'Errore sconosciuto';
+            // `turno_non_attivo` capita solo nella finestra iniziale, prima che il
+            // server attivi il turno dopo l'animazione di pesca del primo giocatore.
+            errorBox.textContent = resp?.motivo === 'turno_non_attivo'
+              ? '⏳ La partita sta per iniziare…'
+              : (resp?.messaggio || 'Errore sconosciuto');
             errorBox.style.display = 'block';
           }
           buzzer();

@@ -395,3 +395,69 @@
     opacity: 0.6;
   }
 }
+
+/* --- Draw view (pesca del primo giocatore) --- */
+.draw-view { text-align: center; }
+
+.draw-title {
+  font-size: var(--font-size-xxl);
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.draw-subtitle {
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.draw-players {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.draw-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.08s ease, background-color 0.08s ease, transform 0.08s ease;
+}
+
+/* Nome evidenziato durante il sorteggio */
+.draw-player--attivo {
+  border-color: var(--primary);
+  background: var(--bg-elevated);
+  transform: scale(1.03);
+}
+
+/* Giocatore estratto */
+.draw-player--scelto {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-text);
+  transform: scale(1.05);
+}
+
+.draw-player--scelto .draw-player__tag::after { content: "🎯"; }
+
+.draw-player__name { font-weight: 600; }
+
+.draw-result {
+  min-height: 1.6em;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw-player { transition: none; }
+  .draw-player--attivo { transform: none; }
+  .draw-player--scelto { transform: none; }
+}

@@ -62,9 +62,9 @@ test('e2e browser: crea → join → ready → avvio → abbandono → game_over
     await alice.click('#btn-ready');
     await bob.click('#btn-ready');
 
-    // Attende che entrambe le pagine entrino nella game view.
-    await expect(alice).toHaveURL(/#game/);
-    await expect(bob).toHaveURL(/#game/);
+    // Attende la "pesca" del primo giocatore e l'ingresso nella game view.
+    await expect(alice).toHaveURL(/#game/, { timeout: 15000 });
+    await expect(bob).toHaveURL(/#game/, { timeout: 15000 });
 
     // 3.b Evidenza del turno: esattamente UN giocatore vede il banner "Tocca a te!"
     //     e l'altro vede la fascia di attesa con il nome dell'avversario.

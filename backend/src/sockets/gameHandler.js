@@ -12,7 +12,7 @@
 import { gameManager } from '../game/GameManager.js';
 import { logger } from '../logger.js';
 import { creaRateLimiter } from '../utils/rateLimiter.js';
-import { broadcastAPartita, registraSocketInPartita } from './lobbyHandler.js';
+import { broadcastAPartita, registraSocketInPartita, broadcastPartitaAvviata, espelliSocketDelGiocatore } from './lobbyHandler.js';
 
 const rateLimiterSubmit = creaRateLimiter({ max: 5, windowMs: 1000 });
 
@@ -138,6 +138,13 @@ export function attachGameHandlers(io, socket) {
 }
 
 export function setupGameManagerBroadcast(io) {
+  // Avvio partita: notifica i client e li sposta nella room di gioco.
+  // Registrato QUI (una volta sola) così vale per entrambi i percorsi di
+  // avvio: "tutti pronti" (set_ready) e timer lobby (GameManager._scattaTimerLobby).
+  gameManager.on('partita_avviata', (match) => {
+    broadcastPartitaAvviata(io, match);
+  });
+
   gameManager.on('mossa_validata', ({ gameId, parola, match }) => {
     logger.debug('mossa_validata_broadcast', { gameId, parola });
   });
@@ -201,7 +208,11 @@ export function setupGameManagerBroadcast(io) {
     broadcastAPartita(io, data.gameId, 'lobby_timer', data);
   });
   gameManager.on('giocatore_espulso', ({ gameId, nome }) => {
+    // 1) Avvisa: l'espulso è ancora nella room, quindi riceve l'evento e torna alla home.
     broadcastAPartita(io, gameId, 'giocatore_espulso', { gameId, nome });
+    // 2) Poi lo stacca dalle room: senza questo continuava a ricevere gli eventi
+    //    (in particolare `partita_avviata`) e rientrava in partita da spettatore.
+    espelliSocketDelGiocatore(io, gameId, nome);
   });
 
   // Best-of-N (manche ↔ match)

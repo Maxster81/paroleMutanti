@@ -275,3 +275,33 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
   (fallback `gameId`; abbandono dopo il grace, quest'ultimo attivo solo con `DISCONNECT_GRACE_SECONDS<=15`).
 - **Verifica e merge**: ok (2026-10-12), mergiato su `main`.
 - **Release**: creato `CHANGELOG.md`, tag annotato `v1.7.0` + GitHub Release.
+
+
+### 🎲 2026-10-12 — v1.8.0: primo giocatore casuale + schermata di "pesca" (branch `feature/primo-giocatore-casuale`)
+- **Ordine casuale**: `ordineCasuale` (Fisher-Yates, `backend/src/utils/ordineGiocatori.js`) mescola i giocatori
+  all'avvio della partita e a ogni nuova manche → il creatore non parte più per forza. Test unit dedicati.
+- **View `#draw`** (`frontend/js/views/draw.js`): animazione di sorteggio che si ferma sul primo giocatore
+  (deciso dal server → uguale per tutti). Rispetta `prefers-reduced-motion`. Il turno server diventa attivo
+  poco prima della fine (`drawMs`, default 2800 ms) → nessun secondo perso, nessun invio "troppo presto".
+- **Fix**: l'avvio via timer lobby non notificava `partita_avviata` (nessun listener) → listener unico in
+  `setupGameManagerBroadcast` + `broadcastPartitaAvviata` (sposta anche lobby→game room).
+- **Test**: `npm test` 54 pass / 0 fail / 16 skip; test aggiornati per l'ordine non deterministico; e2e browser
+  con attesa estesa per la schermata di pesca.
+- Bump 1.7.0 → **1.8.0**.
+### 🐛 2026-10-12 — fix avvio prematuro con lobby incompleta (sul branch `feature/primo-giocatore-casuale`)
+- **Bug**: in una partita per ≥3 giocatori, bastava che i **presenti** fossero pronti per far partire
+  subito il gioco (`tuttiProni = ready.every() && giocatori.length >= 2`), anche con la lobby incompleta
+  e senza countdown (il timer richiedeva `giocatori.length >= 3`).
+- **Fix**: nuovo helper `_lobbyCompletaEPronta(match)` (lobby piena + tutti pronti) per l'avvio immediato;
+  il countdown ora dipende da `max_players >= 3` e `pronti >= 2` (non dai giocatori già entrati).
+- **Test**: 4 test unit senza DB sulla logica lobby (74 totali, 58 pass / 0 fail / 16 skip).
+- Documentato in `regole-gioco.md` §1.1 e `CHANGELOG.md` (voce 1.8.0).
+### 🐛 2026-10-12 — fix: il giocatore espulso entrava in partita come spettatore (branch `feature/primo-giocatore-casuale`)
+- **Bug**: allo scadere del timer lobby il non-pronto veniva rimosso da `match.giocatori` e riceveva
+  `giocatore_espulso`, ma il suo socket restava in `socketToGame`/room → subito dopo riceveva anche
+  `partita_avviata` ed entrava in gioco (schermata di pesca + partita bloccata, timer fermo).
+- **Fix**: nuova `espelliSocketDelGiocatore(io, gameId, nome)` in `lobbyHandler.js` (esce dalle room,
+  tolto dal tracking); chiamata dal listener `giocatore_espulso` DOPO l'avviso e PRIMA di `avviaMatch`.
+  Difesa in profondità lato client: `partita_avviata` ignorata se non sono tra i giocatori.
+- **Bonus**: `rateLimiter` ora fa `unref()` sul cleanup interval (teneva vivo il processo nei test).
+- **Test**: nuovo `backend/tests/lobbyEspulsione.test.js` (75 totali, 59 pass / 0 fail / 16 skip).

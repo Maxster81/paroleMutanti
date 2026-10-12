@@ -42,6 +42,10 @@ l'inglese standard per i concetti nuovi.
 - **Nessun account**: i giocatori si identificano solo con un nome **sessione-only** (1–20 caratteri, validato
   server-side). Nomi duplicati nella stessa partita non sono ammessi; un nome già presente in una partita
   `waiting` impedisce di crearne/entrarne in un'altra.
+- **Primo giocatore**: scelto **a sorte** all'inizio di ogni manche (l'ordine dei giocatori viene mescolato):
+  non è più sempre il creatore della partita. All'avvio della partita i client mostrano una breve animazione
+  di "pesca" del primo giocatore (`drawMs`, default 2800 ms); il turno sul server diventa attivo al termine
+  dell'animazione, così nessuno perde secondi.
 - **Parola iniziale**: scelta casualmente dal dizionario, con lunghezza random nell'intervallo configurato
   (default 5–8), pesata sulla disponibilità (`WordPicker.scegliParolaIniziale`).
 - **Visibilità**: ogni partita è **pubblica** (visibile nella lista della home) o **privata**
@@ -54,12 +58,16 @@ l'inglese standard per i concetti nuovi.
 
 ## 1.1 Timer partenza lobby (anti-attese inutili)
 
-- Se in lobby ci sono **≥3 giocatori** e **≥2 in stato PRONTO ma non tutti**, e quindi non può
-  ancora partire da sola, parte un **countdown** (`LOBBY_TIMER_SECONDS`, default **30s**,
-  configurabile **solo via env**, NON mostrato nell'app).
-- **Appena tutti sono pronti** → la partita **parte subito** (senza attendere la fine del timer).
+- **Avvio immediato** solo quando la lobby è **COMPLETA** (tutti i posti di `max_players` occupati)
+  e **tutti i presenti sono pronti**. Una partita per **2 giocatori** parte subito quando entrambi
+  sono pronti (nessun countdown).
+- Se la partita è configurata per **≥3 giocatori** (`max_players`) e ci sono **≥2 pronti** ma la
+  lobby non è completa/pronta, parte un **countdown** (`LOBBY_TIMER_SECONDS`, default **30s**,
+  configurabile **solo via env**, NON mostrato nell'app). Il countdown parte **anche se non tutti
+  i giocatori attesi sono entrati**: non si aspetta all'infinito un giocatore che potrebbe non arrivare.
 - **Allo scadere del timer**:
   - i giocatori **non pronti** vengono **espulsi** dalla lobby (evento `giocatore_espulso` → tornano alla home);
+    i loro **socket vengono staccati** dalla partita (non ricevono gli eventi di gioco e non entrano come spettatori);
   - i giocatori **pronti** (≥2) **entrano in partita** (`avviaMatch`).
 - **Interruzioni**: se si scende **sotto 2 pronti** (un "annulla pronto") il timer si **annulla**,
   e **riparte da 30** quando la condizione si ristabilisce. Se **entra un nuovo giocatore** il timer
