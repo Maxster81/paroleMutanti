@@ -2,6 +2,15 @@
 
 ## 🎯 Focus Corrente
 
+**🔤 v1.8.2 (branch `fix/parole-caratteri-speciali`) — charset di gioco: SOLO lettere**:
+segnalato che in partita è comparsa la parola base `tutt'e` (apostrofo), che rende la catena di
+mutazioni (distanza 1) impossibile. Causa: il charset in `normalizza.js` **accettava l'apostrofo**
+e i filtri di import/export del dizionario lo includevano (`/^[a-zàèéìòùjkwxy']+$/`). Fix su 3 livelli:
+(1) **selezione** — `WordPicker`/`wordQueries` filtrano con `word ~ '^[a-zàèéìòùjkwxy]+$'`;
+(2) **validazione** — `validaParola` rifiuta apostrofi/spazi/cifre;
+(3) **fonte** — `db/export-dicts.mjs` + `db/import-*-dict.mjs` scartano le voci sporche.
+Aggiunto `npm run db:clean-words` (dry-run di default, `--apply`) per ripulire un DB già popolato.
+
 **🧹 v1.8.1 — rimosso "Tocca a: <nome>" dalla card della parola corrente** (ridondante: lo dice
 già il banner di turno / il contro-banner di attesa). File: `frontend/js/views/game.js`.
 

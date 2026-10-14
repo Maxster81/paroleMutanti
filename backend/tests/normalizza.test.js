@@ -9,7 +9,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizzaBase, validaParola } from '../src/utils/normalizza.js';
+import { readFileSync } from 'node:fs';
+import { normalizzaBase, validaParola, soloLettere, RE_SOLO_LETTERE, PATTERN_SQL_SOLO_LETTERE } from '../src/utils/normalizza.js';
 
 test('normalizzaBase: lowercase + trim', () => {
   assert.equal(normalizzaBase('  BANANA  '), 'banana');
@@ -48,8 +49,14 @@ test('validaParola: accenti italiani accettati', () => {
   assert.equal(validaParola('gioì', 3, 10).valida, true);
 });
 
-test('validaParola: apostrofo accettato (raro ma valido)', () => {
-  assert.equal(validaParola("c'e'", 3, 10).valida, true);
+test('validaParola: apostrofo RIFIUTATO (charset di gioco: solo lettere)', () => {
+  const r = validaParola("c'e'", 3, 10);
+  assert.equal(r.valida, false);
+  assert.equal(r.motivo, 'caratteri_non_validi');
+  // Le voci "sporche" del dizionario non devono mai entrare in partita.
+  assert.equal(validaParola("tutt'e", 3, 10).valida, false);
+  assert.equal(validaParola("po'", 3, 10).valida, false);
+  assert.equal(validaParola("l'amico", 3, 10).valida, false);
 });
 
 // === M4b-fix: prestiti consolidati con lettere straniere sono accettati ===
@@ -122,4 +129,30 @@ test('validaParola: lunghezza al boundary superiore', () => {
   const r = validaParola('bananone', 3, 8);
   assert.equal(r.valida, true);
   assert.equal(r.normalizzata, 'bananone');
+});
+
+// === Charset di gioco: solo lettere (niente apostrofi/spazi/cifre) ===
+
+test('soloLettere: accetta lettere (anche accentate e prestiti), rifiuta il resto', () => {
+  for (const ok of ['casa', 'città', 'perché', 'weekend', 'yogurt', 'xilofono']) {
+    assert.equal(soloLettere(ok), true, ok);
+  }
+  for (const ko of ["tutt'e", "po'", "l'amico", 'week-end', 'casa2', 'casa mia', '', 'casa!']) {
+    assert.equal(soloLettere(ko), false, ko);
+  }
+  assert.equal(soloLettere(null), false);
+});
+
+test('PATTERN_SQL_SOLO_LETTERE: stessa regola di RE_SOLO_LETTERE (per le query DB)', () => {
+  assert.equal(PATTERN_SQL_SOLO_LETTERE, RE_SOLO_LETTERE.source);
+  const re = new RegExp(PATTERN_SQL_SOLO_LETTERE);
+  assert.equal(re.test('casa'), true);
+  assert.equal(re.test("tutt'e"), false);
+});
+
+test('charset: la regex di db/export-dicts.mjs è allineata al backend', () => {
+  const sorgente = readFileSync(new URL('../../db/export-dicts.mjs', import.meta.url), 'utf8');
+  const m = sorgente.match(/const RE_CHARSET = (\/.*\/);/);
+  assert.ok(m, 'RE_CHARSET non trovata in db/export-dicts.mjs');
+  assert.equal(m[1], String(RE_SOLO_LETTERE), 'la regex del build deve coincidere con RE_SOLO_LETTERE');
 });

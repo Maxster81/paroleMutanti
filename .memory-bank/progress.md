@@ -320,3 +320,20 @@ Il gioco è **giocabile end-to-end** e **live in produzione**:
 - `once()` nei test e2e ha ora un **timeout** (10s): un evento atteso che non arriva fa fallire il test
   invece di bloccare la pipeline.
 - Riferimenti: commit `bb3a8b4` / merge `ee89ce7`; tag **v1.8.1**.
+
+### 🔤 2026-10-13 — v1.8.2: charset di gioco SOLO lettere (branch `fix/parole-caratteri-speciali`)
+- **Bug**: in partita è uscita la parola base `tutt'e`. Il charset accettava l'apostrofo sia in
+  validazione sia nei filtri di import/export del dizionario → una voce "sporca" del DB poteva
+  diventare parola base e rendere impossibile la catena a distanza 1.
+- **Fix (3 livelli)**:
+  1. `backend/src/utils/normalizza.js`: `RE_SOLO_LETTERE` + `PATTERN_SQL_SOLO_LETTERE` + `soloLettere()`;
+     `validaParola` rifiuta apostrofi/spazi/cifre.
+  2. `backend/src/db/wordQueries.js`: `paroleCasuali` e `conteggioPerLunghezza` filtrano con
+     `word ~ $pattern` (le parole sporche non possono più essere scelte).
+  3. `db/export-dicts.mjs`, `db/import-lo-dict.mjs`, `db/import-hf-dict.mjs`: scartano le voci sporche
+     (export-dicts tiene la regex inline perché la build Docker copia solo quello script; c'è un test
+     che verifica l'allineamento con `RE_SOLO_LETTERE`).
+- **Nuovo** `db/clean-words.mjs` + `npm run db:clean-words`: pulizia dei DATI di un DB già popolato
+  (dry-run di default, `--apply` per eliminare). Il gioco però non ne ha bisogno per funzionare.
+- **Test**: `normalizza.test.js` aggiornato (apostrofo ora rifiutato) + nuovi test su `soloLettere`,
+  pattern SQL e coerenza con export-dicts. Totale 78 test: 62 pass / 0 fail / 16 skip.

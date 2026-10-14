@@ -3,26 +3,38 @@
  *
  * Usato dal Validator per preparare la parola prima della validazione.
  * - lowercase + trim
- * - charset italiano (lettere a-z, accentate, apostrofo) + prestiti consolidati (j, k, w, x, y)
+ * - charset italiano: SOLO lettere (a-z, accentate àèéìòù) + prestiti
+ *   consolidati (j, k, w, x, y)
  * - lunghezza entro range
+ *
+ * ⚠️ CHARSET UFFICIALE DEL GIOCO: niente apostrofi, spazi, trattini o cifre.
+ * Le voci di dizionario che li contengono (es. "tutt'e", "l'amico", "po'")
+ * sono ESCLUSE dal gioco: non vengono mai scelte come parola base né accettate
+ * come mosse. Motivo: la catena di mutazioni (distanza 1) non funziona con
+ * parole "sporche" e la partita si blocca.
+ * La stessa regola è applicata in db/export-dicts.mjs, db/import-*-dict.mjs e
+ * nelle query di selezione (backend/src/db/wordQueries.js).
  *
  * @module backend/src/utils/normalizza
  */
 
 /**
- * Espressione regolare per lettere italiane + prestiti consolidati.
- * Include: a-z, àèéìòù (accenti), apostrofo, jkwxy (parole straniere ormai
- * di uso comune in italiano: wifi, weekend, jazz, kiwi, yogurt, ecc.)
+ * Espressione regolare del charset di gioco: SOLO lettere.
+ * Include a-z, le accentate italiane (àèéìòù) e i prestiti consolidati
+ * (j, k, w, x, y: wifi, weekend, jazz, kiwi, yogurt, xilofono...).
+ * NON ammette apostrofi, spazi, trattini, cifre o altri simboli.
  */
-const RE_CHARSET_ITALIANO = /^[a-zàèéìòùjkwxy]+$/;
+export const RE_SOLO_LETTERE = /^[a-zàèéìòùjkwxy]+$/;
 
 /**
- * Espressione regolare per lettere italiane con apostrofo opzionale.
+ * La stessa regola di {@link RE_SOLO_LETTERE} come STRINGA, per l'operatore
+ * regex di PostgreSQL (`word ~ $1`) usato nelle query di selezione.
+ * Va tenuta allineata a RE_SOLO_LETTERE (c'è un test che lo verifica).
  */
-const RE_CHARSET_CON_APOSTROFO = /^[a-zàèéìòùjkwxy']+$/;
+export const PATTERN_SQL_SOLO_LETTERE = '^[a-zàèéìòùjkwxy]+$';
 
 /**
- * Normalizza una stringa di input: lowercase, trim, no caratteri strani.
+ * Normalizza una stringa di input: lowercase + trim.
  *
  * @param {string} input - input utente grezzo
  * @returns {string} input normalizzato
@@ -33,8 +45,19 @@ export function normalizzaBase(input) {
 }
 
 /**
+ * true se la stringa contiene SOLO lettere ammesse dal gioco
+ * (niente apostrofi, spazi, cifre o simboli).
+ *
+ * @param {string} parola
+ * @returns {boolean}
+ */
+export function soloLettere(parola) {
+  return typeof parola === 'string' && RE_SOLO_LETTERE.test(parola);
+}
+
+/**
  * Verifica se una parola è valida per il gioco:
- * - Solo lettere italiane (a-z + accenti + prestiti j, k, w, x, y) o lettere + apostrofo
+ * - Solo lettere italiane (a-z + accenti + prestiti j, k, w, x, y)
  * - Lunghezza entro [min, max]
  *
  * Ritorna un oggetto con:
@@ -62,7 +85,7 @@ export function validaParola(input, min, max) {
     return { valida: false, motivo: 'troppo_lunga', normalizzata };
   }
 
-  if (!RE_CHARSET_ITALIANO.test(normalizzata) && !RE_CHARSET_CON_APOSTROFO.test(normalizzata)) {
+  if (!RE_SOLO_LETTERE.test(normalizzata)) {
     return { valida: false, motivo: 'caratteri_non_validi', normalizzata };
   }
 

@@ -95,7 +95,11 @@ Validazione server-side in `creaPartita()` (`backend/src/game/GameManager.js`).
 Una mossa è accettata solo se supera **tutti** i controlli in quest'ordine:
 
 1. **Charset e lunghezza** (`normalizza.validaParola`):
-   - solo lettere italiane `a-z àèéìòù`, più i prestiti consolidati `j k w x y`, più apostrofo;
+   - **solo lettere**: `a-z`, accentate `àèéìòù` e prestiti consolidati `j k w x y`;
+   - **niente apostrofi, spazi, trattini o cifre**: le voci di dizionario che li contengono
+     (es. `tutt'e`, `l'amico`, `po'`) sono **escluse dal gioco** — non vengono mai scelte come
+     parola base (il `WordPicker` filtra con `word ~ '^[a-zàèéìòùjkwxy]+$'`) e non sono accettate
+     come mosse. Motivo: una parola "sporca" rende impossibile la catena di mutazioni (distanza 1);
    - lunghezza tra **3 e 10** caratteri.
 2. **Anti-ripetizione**: la parola non deve essere già usata nella partita (`paroleUsate`).
 3. **Distanza Levenshtein = 1** dalla parola precedente (`utils/levenshtein.isDistanzaUno`):

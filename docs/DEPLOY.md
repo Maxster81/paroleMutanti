@@ -254,13 +254,22 @@ dalla rete.
 
 | Passo | Dove | Cosa fa |
 | ----- | ---- | ------- |
-| 1. `db/export-dicts.mjs` | **build** (stage `builder`) | scarica LibreOffice `it_IT.dic` + Hugging Face `dictionary_sorted.json`, filtra (3-10 lettere, charset italiano) e scrive `dict/words.tsv.gz` (~0,5 MB, 185.723 parole) |
+| 1. `db/export-dicts.mjs` | **build** (stage `builder`) | scarica LibreOffice `it_IT.dic` + Hugging Face `dictionary_sorted.json`, filtra (3-10 lettere, **solo lettere**: niente apostrofi/spazi/cifre) e scrive `dict/words.tsv.gz` (~0,5 MB, 185.723 parole) |
 | 2. `db/init-db.js` | avvio container | applica `db/init-db.sql` (idempotente: tabelle, indici, vista) |
 | 3. `db/seed-words.mjs` | avvio container | se `words` è vuota importa l'artefatto locale in batch (~2 s); se è già popolata **non fa nulla** |
 | 4. `db/wait-for-db.mjs` | avvio container | attende che PostgreSQL risponda (timeout `DB_WAIT_SECONDS`, default 60s) |
 
 I passi 2-4 sono orchestrati da `deploy/docker-entrypoint.sh` e sono visibili in
 `docker compose logs app`.
+
+> **Igiene del dizionario.** Il gioco scarta già in selezione le voci non
+> giocabili (apostrofi, spazi, cifre: es. `tutt'e`), quindi non possono più
+> bloccare una partita. Per ripulire anche i **dati** di un DB già popolato:
+>
+> ```bash
+> docker compose exec app npm run db:clean-words              # dry-run
+> docker compose exec app npm run db:clean-words -- --apply  # elimina
+> ```
 
 ```bash
 # Verifica rapida del dizionario
