@@ -46,8 +46,13 @@ const LO_URL =
 const HF_URL =
   'https://huggingface.co/datasets/mik3ml/italian-dictionary/resolve/main/dictionary_sorted.json';
 
-// Charset: lettere italiane + prestiti consolidati (wifi, weekend, jazz, kiwi, yogurt)
-const RE_CHARSET = /^[a-zàèéìòùjkwxy']+$/;
+// Charset di gioco: SOLO lettere (a-z + accentate àèéìòù + prestiti j,k,w,x,y).
+// NIENTE apostrofi/spazi/trattini/cifre: voci come "tutt'e" o "l'amico"
+// bloccherebbero la catena di mutazioni (distanza 1) e vanno escluse.
+// ⚠️ Lo stage `builder` della build Docker copia SOLO questo script (non
+//    vede backend/): la regola è quindi duplicata qui di proposito e va
+//    tenuta allineata a backend/src/utils/normalizza.js (RE_SOLO_LETTERE).
+const RE_CHARSET = /^[a-zàèéìòùjkwxy]+$/;
 
 /** Parsing argomenti CLI nella forma --chiave=valore. */
 const argomenti = {};

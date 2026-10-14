@@ -214,7 +214,7 @@ function messaggioPerMotivo(motivo) {
     case 'troppo_lunga':
       return 'La parola è troppo lunga.';
     case 'caratteri_non_validi':
-      return 'La parola contiene caratteri non ammessi (solo lettere italiane a-z, àèéìòù).';
+      return 'La parola può contenere solo lettere (niente apostrofi, spazi, numeri o simboli).';
     default:
       return 'Parola non valida.';
   }

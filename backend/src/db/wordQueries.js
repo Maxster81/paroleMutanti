@@ -13,6 +13,7 @@
  */
 
 import { query } from './pool.js';
+import { PATTERN_SQL_SOLO_LETTERE } from '../utils/normalizza.js';
 import { logger } from '../logger.js';
 
 /**
@@ -110,9 +111,11 @@ export async function inserisciParolaAI(parola) {
  */
 export async function paroleCasuali(lunghezza, n = 1) {
   if (lunghezza < 1 || n < 1) return [];
+  // Filtro `word ~ PATTERN_SQL_SOLO_LETTERE`: esclude le voci "sporche" del
+  // dizionario (apostrofi, spazi, cifre...) che bloccherebbero la partita.
   const result = await query(
-    'SELECT word FROM words WHERE length = $1 ORDER BY random() LIMIT $2',
-    [lunghezza, n]
+    'SELECT word FROM words WHERE length = $1 AND word ~ $2 ORDER BY random() LIMIT $3',
+    [lunghezza, PATTERN_SQL_SOLO_LETTERE, n]
   );
   return result.rows.map((r) => r.word);
 }
@@ -134,9 +137,11 @@ export async function conteggioTotale() {
  * @returns {Promise<number>}
  */
 export async function conteggioPerLunghezza(lunghezza) {
+  // Stesso filtro della selezione: il peso per lunghezza deve contare solo
+  // le parole effettivamente giocabili.
   const result = await query(
-    'SELECT COUNT(*) AS totale FROM words WHERE length = $1',
-    [lunghezza]
+    'SELECT COUNT(*) AS totale FROM words WHERE length = $1 AND word ~ $2',
+    [lunghezza, PATTERN_SQL_SOLO_LETTERE]
   );
   return parseInt(result.rows[0].totale, 10);
 }

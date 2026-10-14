@@ -3,6 +3,20 @@
 Modifiche rilevanti del progetto. Formato ispirato a [Keep a Changelog](https://keepachangelog.com/it/1.1.0/);
 versioning [SemVer](https://semver.org/lang/it/). `VERSION` e `package.json` restano allineati.
 
+## [1.8.2] — 2026-10-13
+
+### Fixed
+- **Parole con caratteri speciali (es. `tutt'e`) bloccavano la partita**: il charset
+  accettava l'apostrofo, quindi dal dizionario poteva uscire una parola base non percorribile
+  (la catena a distanza 1 diventava impossibile). Ora il charset di gioco è **solo lettere**:
+  le voci con apostrofi/spazi/cifre sono escluse **in selezione** (`WordPicker`/`wordQueries`
+  filtrano con `word ~ '^[a-zàèéìòùjkwxy]+$'`), **in validazione** (`validaParola` le rifiuta)
+  e **alla fonte** (import/export del dizionario).
+
+### Added
+- **`npm run db:clean-words`**: ripulisce un DB già popolato dalle voci non giocabili
+  (dry-run di default, `--apply` per eliminare).
+
 ## [1.8.1] — 2026-10-12
 
 ### Changed

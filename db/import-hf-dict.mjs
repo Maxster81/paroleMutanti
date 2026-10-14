@@ -18,14 +18,16 @@
 
 import { writeFile, readFile, unlink } from 'node:fs/promises';
 import { query } from '../backend/src/db/pool.js';
+import { RE_SOLO_LETTERE } from '../backend/src/utils/normalizza.js';
 
 const DICT_URL = 'https://huggingface.co/datasets/mik3ml/italian-dictionary/resolve/main/dictionary_sorted.json';
 const TMP_FILE = '/tmp/dict_hf.json';
 const MIN_LENGTH = 3;
 const MAX_LENGTH = 10;
 
-// Charset: lettere italiane + prestiti consolidati
-const RE_CHARSET = /^[a-zàèéìòùjkwxy']+$/;
+// Charset di gioco: SOLO lettere (niente apostrofi/spazi/cifre).
+// Regola canonica condivisa col backend e con le query di selezione.
+const RE_CHARSET = RE_SOLO_LETTERE;
 
 async function download() {
   console.log(`[import-hf] Download da: ${DICT_URL}`);
