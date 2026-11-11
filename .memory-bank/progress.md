@@ -179,6 +179,28 @@
   rimappatura alias. Suite: **74 test** (60 pass + 14 skip e2e senza stack)
 - [x] `VERSION` + `package.json` → **1.8.3** (base `1.8.2`)
 
+### Esperimento `logprobs` — esito: NESSUN segnale utile, archiviato (2026-11-11)
+- [x] **Domanda**: la distribuzione del primo token (logprobs/top_logprobs) separa i
+  verdetti "sicuri" dagli "incerti" abbastanza da giustificare una soglia?
+- [x] **Metodo**: `backend/scripts/experiment-logprobs.mjs`, dataset etichettato di 26
+  parole (8 valide ovvie, 7 valide difficili incl. `oziata`/`oziati`, 10 non valide
+  plausibili), `max_tokens: 1`, stesso prompt/`thinking: disabled` del gioco. Due run:
+  `temperature: 0` e `temperature: 1`.
+- [x] **Risultato temp 0**: margine = **1.000 su tutte** le 25 parole leggibili →
+  distribuzione **degenere** (il token scelto prende tutta la massa): zero informazione.
+- [x] **Risultato temp 1**: probabilità "vere" ma quasi tutte ≈ 1.0; i **2 errori**
+  (`oziata` 0.00017 · `oziati` 0.00045) sono **confidenti e sbagliati** → nessuna soglia
+  li intercetta. L'unico caso incerto è `rintontita` (P(YES)=0.543, margine 0.086), che
+  però è un verdetto **corretto**: la confidenza non correla con l'errore.
+- [x] **Tokenizzazione**: il primo token è sempre esattamente `YES` o `NO` (25/25), mai
+  un preambolo → il body attuale (`max_tokens: 8` + `stop`) e il parsing robusto bastano.
+- [x] **Conclusione**: **non integrare** logprobs/confidenza nel client. Le 2 forme flesse
+  errate sono già gestite da `morfologia` (`source='MORF'`) prima dell'AI: il margine di
+  miglioramento va cercato in **dizionario + regole morfologiche**, non nell'LLM.
+- [x] Evidenze committate: `backend/scripts/logprobs-result-temp0.json`,
+  `backend/scripts/logprobs-result-temp1.json`. Script riutilizzabile
+  (`npm run experiment:logprobs`, `--temp=N`, `--debug`, `--samples=N`).
+
 ### Post-M5 (opzionali / rifiniture)
 - [x] Test Playwright multi-context a 4 giocatori: 4 contesti isolati (Alice/Bob/Carlo/Diana) → stessa parola per tutti, ognuno vede i 4 giocatori, nessun conflitto localStorage
 - [x] Rifiniture audio: envelope anti-click, `success()` come arpeggio di Do maggiore, `buzzer()` a due toni, `tick()`/`click()` con forme d'onda dedicate

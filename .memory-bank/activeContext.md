@@ -80,8 +80,16 @@ inefficace `temperature`), `max_tokens` 4→8 + `stop`, gestione di `finish_reas
 Aggiunti 10 test con `fetch` mockato (`backend/tests/deepseekClient.test.js`) e
 `backend/scripts/check-deepseek.mjs` (`GET /v1/models` + `--live`). **Da fare in
 produzione**: aggiornare `.env` (`DEEPSEEK_MODEL=deepseek-flash`, o rimuovere la
-riga) e lanciare lo script di verifica nel container. Prossimo passo concordato:
-esperimento `logprobs`/`top_logprobs` per un punteggio di confidenza (rimandato).
+riga) e lanciare lo script di verifica nel container. **Esperimento `logprobs`
+eseguito e archiviato (2026-11-11): negativo all'uso pratico** — a temp 0 la
+distribuzione è degenere (margine 1.000 su tutte le parole) e a temp 1 i due
+errori (`oziata`/`oziati`) restano confidenti (P(YES)≈0.0002), quindi nessuna
+soglia può filtrarli. L'unico caso incerto (`rintontita`, P(YES)=0.543) è un
+verdetto **corretto**: la confidenza non correla con l'errore. Evidenze:
+`backend/scripts/logprobs-result-temp0.json` e `-temp1.json`. Il verdetto del
+modello consiste sempre nel solo token YES/NO (nessun preambolo), quindi
+`max_tokens: 8` + `stop` + parsing robusto sono sufficienti. Prossimo passo se
+si vuole migliorare la validazione: **dizionario/morfologia**, non l'AI.
 
 **Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (desincronizzazione `3437de2`, **M5c anti-ripetizione + elenco parole**, **validazione a tre fasi DB+morfologia+AI**). **M6 Deploy completato e live** (`parolemutanti.maxster.top`, ora percorso storico). **Audit regola 08 eseguito (1.3.3)**: fix CORS prod, validazioni server-side mancanti, parole rimosse dai log, `broadcastAPartita` su room, `.env.example` completato; aggiunti **test di integrazione GameManager** e **test e2e socket**.
 

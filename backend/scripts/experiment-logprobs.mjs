@@ -26,6 +26,17 @@
  *   --no-save     non scrive il JSON dei risultati
  *
  * Costo: ~26 parole × (1 + samples) chiamate, output 1 token → frazioni di centesimo.
+ *
+ * ESITO (2026-11-11) — l'esperimento ha dato **risposta negativa**:
+ * - a `temperature: 0` le logprobs sono degeneri (margine 1.000 su tutte le parole):
+ *   il token scelto prende tutta la massa, zero informazione di confidenza;
+ * - a `temperature: 1` le probabilità sono "vere" ma quasi tutte ≈ 1.0, e i DUE errori
+ *   del dataset (`oziata`/`oziati`) restano confidentissimi (P(YES)≈0.0002): nessuna
+ *   soglia può filtrarli. L'unico caso incerto (`rintontita`) è un verdetto corretto.
+ * Conclusione: NON integrare una soglia di confidenza. Evidenze in
+ * `logprobs-result-temp0.json` e `logprobs-result-temp1.json`. Il token del verdetto è
+ * sempre esattamente YES/NO (nessun preambolo). Per migliorare la validazione conviene
+ * investire su dizionario e morfologia, non sull'LLM.
  */
 
 import { writeFile } from 'node:fs/promises';
