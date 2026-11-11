@@ -25,7 +25,8 @@
     "db:clean-words": "node db/clean-words.mjs",
     "db:update": "node db/update-lo.mjs",
     "db:setup": "npm run db:reset && npm run db:import",
-    "test:e2e:browser": "playwright test"
+    "test:e2e:browser": "playwright test",
+    "experiment:logprobs": "node backend/scripts/experiment-logprobs.mjs"
   },
   "keywords": [
     "game",
