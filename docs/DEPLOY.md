@@ -232,6 +232,9 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/     # 200
 # Dizionario nel DB (conteggio parole, distribuzione, query random)
 docker compose exec app npm run db:check
 
+# Statistiche di gioco e di validazione (partite, mosse, ricorso all'AI)
+docker compose exec app npm run db:stats
+
 # Log applicativi (json-file, rotazione 10m x 5)
 docker compose logs --tail=50 app
 ```

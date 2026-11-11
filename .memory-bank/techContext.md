@@ -87,6 +87,7 @@ npm run db:export-dicts# costruisce dict/words.tsv.gz (usato nella build Docker)
 npm run db:seed        # popola `words` dall'artefatto locale (primo avvio container)
 npm run db:wait        # attende che PostgreSQL risponda
 npm run db:check       # verifica stato DB
+npm run db:stats       # statistiche partite/mosse/validazione (--days=N, --json, --words=N)
 npm run db:reset       # DROP + ricrea schema (ATTENZIONE)
 ```
 

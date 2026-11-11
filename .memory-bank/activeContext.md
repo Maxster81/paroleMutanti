@@ -67,6 +67,15 @@ seed 185.723 parole in 2,0 s, secondo avvio no-op, `/health` ok, partita e2e 11/
 `npm test` 64/64. **Verifica sul server: a cura dell'utente** (Docker non disponibile
 in sandbox).
 
+**📊 Statistiche su DB (2026-11-11, versione `1.8.4`)**: le statistiche di gioco prima
+vivevano solo nei log (persi a ogni rebuild). Ora il `GameManager` le persiste in
+**`games`** (ciclo di vita/UPSERT) e **`moves`** (un tentativo di parola con
+`source` DB/MORF/AI, motivo, durata AI), con scritture **fire-and-forget** che non
+rallentano il game loop. La parola è salvata **solo** per le mosse che raggiungono l'AI
+(candidati per il dizionario). Comando: **`npm run db:stats`** (`--days`, `--json`,
+`--words`), anche nel container. **Da verificare sul DB reale** (sandbox senza
+PostgreSQL): `db:init` + `db:stats` + una partita di prova.
+
 **🤖 Fallback AI — hardening API DeepSeek (2026-11-11, versione `1.8.3`, su `main`
 con base `1.8.2`)**: `DEEPSEEK_MODEL=deepseek-chat` è un alias
 **ritirato** (changelog DeepSeek 2026-04-24 → dismissione 2026-07-24) e un errore

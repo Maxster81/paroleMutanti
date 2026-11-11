@@ -62,10 +62,10 @@
                              │ pg.Pool (TCP)
 ┌────────────────────────────▼────────────────────────────────┐
 │              PostgreSQL 16 (Database)                        │
-│  ┌────────┐  ┌────────┐  ┌──────────┐                      │
-│  │ words  │  │ games  │  │game_logs │                      │
-│  │ ~500k  │  │  meta  │  │  stats   │                      │
-│  └────────┘  └────────┘  └──────────┘                      │
+│  ┌────────┐  ┌────────┐  ┌────────┐  ┌──────────┐          │
+│  │ words  │  │ games  │  │ moves  │  │game_logs │          │
+│  │ ~185k  │  │  ciclo │  │validaz.│  │ legacy   │          │
+│  └────────┘  └────────┘  └────────┘  └──────────┘          │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -139,8 +139,13 @@ Il rientro (`request_state` con `nome`) annulla il timer.
 
 ## 📊 Pattern di Persistenza
 - **words**: persistenza completa (validità permanente, cache)
-- **games**: solo metadati + snapshot. Lo state-of-truth è in RAM (GameManager) per performance
-- **game_logs**: scritto solo a `game_over` (evento finale)
+- **games**: ciclo di vita della partita (UPSERT a creazione/avvio/fine/annullo). Lo
+  state-of-truth resta in RAM (GameManager); il DB serve alle statistiche, non al gioco
+- **moves**: un tentativo di parola con la fonte del verdetto (`DB`/`MORF`/`AI`), motivo del
+  rifiuto, durata AI e numero di tentativo. Scritture **fire-and-forget** (non bloccano il
+  game loop); il testo della parola è salvato solo per le mosse che raggiungono l'AI (privacy)
+- **game_logs**: LEGACY, non più scritta (lo storico vive in `games` + `moves`)
+- Statistiche: `npm run db:stats` (in container: `docker compose exec app npm run db:stats`)
 
 ## 🎵 Pattern Audio
 - **AudioContext singleton** creato al primo user gesture (per autoplay policy)

@@ -25,6 +25,11 @@ npm run db:update          # Reimport incrementale LO (INSERT con ON CONFLICT)
 # Verifica
 npm run db:check           # Stats DB
 
+# Statistiche di gioco/validazione (partite, mosse, ricorso all'AI)
+npm run db:stats           # ultimi 14 giorni
+npm run db:stats -- --days=30
+npm run db:stats -- --json
+
 # Reset (ATTENZIONE: cancella tutto)
 npm run db:reset
 ```

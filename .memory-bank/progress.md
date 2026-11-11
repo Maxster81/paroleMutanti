@@ -179,6 +179,38 @@
   rimappatura alias. Suite: **74 test** (60 pass + 14 skip e2e senza stack)
 - [x] `VERSION` + `package.json` → **1.8.3** (base `1.8.2`)
 
+### Statistiche di gioco persistite su DB (1.8.4)
+- [x] **Problema**: le statistiche esistevano solo nei log, persi a ogni rebuild del container
+  (json-file ruotato, container ricreato al deploy). Con l'app non ancora distribuita non
+  c'era modo di sapere se/quanto il fallback AI serva davvero.
+- [x] **Schema** (`db/init-db.sql`, idempotente + applicato dall'entrypoint a ogni avvio):
+  - `games` — ciclo di vita (creata/avviata/finita/annullata), durata, giocatori,
+    punteggio, vincitore, abbandoni. Nuova colonna `abandonments` via
+    `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` (per i DB già esistenti);
+  - `moves` — un tentativo di parola: manche/turno/tentativo, giocatore, `valida`, `motivo`,
+    `source` (DB/MORF/AI), `ai_usata`, `ai_durata_ms`. **Nessuna FK** verso `games`:
+    le scritture sono fire-and-forget e non c'è garanzia d'ordine (game_id indicizzato);
+  - `game_logs` marcata **legacy** (mai scritta: lo storico ora è in `games` + `moves`).
+- [x] **Privacy**: la parola è salvata SOLO per le mosse che raggiungono l'AI
+  (`ai_usata` o `motivo='rate_limit'`) — i candidati utili per il dizionario. Le mosse
+  normali non persistono il testo (regola 8.C). Regola in un unico punto: `statsRows.js`.
+- [x] **Codice**: `backend/src/db/statsRows.js` (funzioni pure, testabili),
+  `backend/src/db/statsQueries.js` (UPSERT partita + INSERT mossa, fire-and-forget,
+  warning DB al massimo 1/minuto), hook in `GameManager` su crea/avvia/fine/annullo/
+  abbandono/submit.
+- [x] **Comando** `npm run db:stats` (`db/stats.js`, `--days=N`, `--json`, `--words=N`):
+  partite e durate, fonti del verdetto, % ricorso AI, latenza AI, motivi di rifiuto,
+  serie giornaliera, parole arrivate all'AI. Nel container:
+  `docker compose exec app npm run db:stats`.
+- [x] **Test**: `backend/tests/statsRows.test.js` (8 test, inclusa la regola di privacy).
+  Suite: **105 test** (89 pass, 16 skip e2e senza stack), 0 fail. SQL validato offline
+  con un parser (`pgsql-ast-parser`): 23 statement di schema + query OK.
+- [x] Documentazione: `CHANGELOG.md` (1.8.4), `db/README.md`, `docs/DEPLOY.md` §4,
+  `systemPatterns.md`, `techContext.md`. Bump `VERSION`/`package.json` → **1.8.4**.
+- [ ] **Verifica su DB reale da fare in produzione** (in sandbox non c'è PostgreSQL né
+  Docker): `npm run db:init && npm run db:stats` — poi giocare una partita e rilanciare
+  `db:stats`.
+
 ### Esperimento `logprobs` — esito: NESSUN segnale utile, archiviato (2026-11-11)
 - [x] **Domanda**: la distribuzione del primo token (logprobs/top_logprobs) separa i
   verdetti "sicuri" dagli "incerti" abbastanza da giustificare una soglia?

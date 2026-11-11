@@ -1,6 +1,6 @@
 {
   "name": "parole-mutanti",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "description": "Gioco multiplayer realtime di modifica parole italiane",
   "type": "module",
   "main": "backend/src/server.js",
@@ -26,7 +26,8 @@
     "db:update": "node db/update-lo.mjs",
     "db:setup": "npm run db:reset && npm run db:import",
     "test:e2e:browser": "playwright test",
-    "experiment:logprobs": "node backend/scripts/experiment-logprobs.mjs"
+    "experiment:logprobs": "node backend/scripts/experiment-logprobs.mjs",
+    "db:stats": "node db/stats.js"
   },
   "keywords": [
     "game",

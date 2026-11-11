@@ -21,6 +21,7 @@ import { validaMossa } from './Validator.js';
 import { TurnManager } from './TurnManager.js';
 import { normalizzaBase } from '../utils/normalizza.js';
 import { ordineCasuale } from '../utils/ordineGiocatori.js';
+import { registraPartita, registraMossa } from '../db/statsQueries.js';
 
 // Intervalli sweeper (ms)
 const TIMEOUT_WAITING_MS = 5 * 60 * 1000;       // 5 min
@@ -121,11 +122,16 @@ export class GameManager extends EventEmitter {
       endedAt: null,
       lastActivityAt: new Date(),
       aiValidationsCount: 0,
+      // Statistiche: elenco iniziale (non toccato dagli abbandoni) e conteggio
+      // abbandoni, persistiti su DB a fine partita.
+      giocatoriIniziali: [],
+      abbandoni: 0,
     };
     this.matches.set(id, match);
     this.socketsPerMatch.set(id, new Set());
     logger.info('partita_creata', { id, creator: nome, maxPlayers, turnSeconds });
     this.emit('partita_creata', match);
+    registraPartita(match, 'waiting');
     return { ok: true, match };
   }
 
@@ -335,6 +341,7 @@ export class GameManager extends EventEmitter {
       // L'elenco stabile (giocatoriOriginali) resta nell'ordine di ingresso;
       // l'ordine di gioco della manche è invece CASUALE (non parte più il creatore).
       match.giocatoriOriginali = [...match.giocatori];
+      match.giocatoriIniziali = [...match.giocatori]; // per le statistiche (abbandoni inclusi)
       match.giocatori = ordineCasuale(match.giocatori);
       match.punteggio = {};
       match.mancheCorrente = 1;
@@ -360,6 +367,7 @@ export class GameManager extends EventEmitter {
 
       logger.info('partita_avviata', { gameId, parolaIniziale, gamesToWin: match.gamesToWin, drawMs: match.drawMs });
       this.emit('partita_avviata', match);
+      registraPartita(match, 'running');
       return { ok: true, match };
     } catch (errore) {
       logger.error('avvio_partita_fallito', { gameId, errore: errore.message });
@@ -376,6 +384,10 @@ export class GameManager extends EventEmitter {
     if (match.turnManager.giocatoreCorrente() !== nomeGiocatore) {
       return { ok: false, valida: false, motivo: 'non_sei_di_turno' };
     }
+
+    // Catturati PRIMA del submit: TurnManager fa avanzare round/manche.
+    const manchePrima = match.mancheCorrente;
+    const turnoPrima = match.turnManager.turno;
 
     const risultato = await validaMossa({
       parolaPrecedente: match.currentWord,
@@ -417,6 +429,21 @@ export class GameManager extends EventEmitter {
       });
       logger.info('mossa_rifiutata', { gameId, giocatore: nomeGiocatore, motivo: risultato.motivo, tentativi: esitoSubmit?.tentativi, limbo: !!esitoSubmit?.limbo });
     }
+
+    // Statistiche (fire-and-forget): fonte del verdetto, motivo, costo AI.
+    registraMossa({
+      gameId,
+      manche: manchePrima,
+      turno: turnoPrima,
+      giocatore: nomeGiocatore,
+      valida: risultato.valida,
+      motivo: risultato.motivo ?? null,
+      source: risultato.source ?? null,
+      aiUsata: risultato.ai_usata === true,
+      aiDurataMs: risultato.ai_durata_ms ?? null,
+      tentativo: esitoSubmit?.tentativi ?? null,
+      parola: risultato.normalizzata,
+    });
 
     return {
       ok: true,
@@ -612,6 +639,7 @@ export class GameManager extends EventEmitter {
     // Best-of-N: abbandono DEFINITIVO → non rientra nelle manche successive.
     const idxOrig = match.giocatoriOriginali.indexOf(nomeGiocatore);
     if (idxOrig !== -1) match.giocatoriOriginali.splice(idxOrig, 1);
+    match.abbandoni += 1;
     match.lastActivityAt = new Date();
 
     // Rimozione sicura dalla manche corrente (fix indice) + segnalazione.
@@ -703,6 +731,7 @@ export class GameManager extends EventEmitter {
     if (match.turnManager) match.turnManager.stop();
     logger.info('partita_finita', { gameId, vincitore, durata_ms: match.endedAt - match.startedAt, aiValidations: match.aiValidationsCount });
     this.emit('partita_finita', match);
+    registraPartita(match, 'finished');
   }
 
   _cancellaMatch(gameId) {
@@ -713,6 +742,7 @@ export class GameManager extends EventEmitter {
     if (match.turnManager) match.turnManager.stop();
     logger.info('partita_cancellata', { gameId });
     this.emit('partita_cancellata', match);
+    registraPartita(match, 'cancelled');
   }
 
   // ============================================================

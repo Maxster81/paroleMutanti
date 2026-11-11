@@ -3,6 +3,30 @@
 Modifiche rilevanti del progetto. Formato ispirato a [Keep a Changelog](https://keepachangelog.com/it/1.1.0/);
 versioning [SemVer](https://semver.org/lang/it/). `VERSION` e `package.json` restano allineati.
 
+## [1.8.4] — 2026-11-11
+
+### Added
+- **Statistiche di gioco persistite su DB** (prima esistevano solo nei log, persi a ogni
+  rebuild del container):
+  - **`games`** — ciclo di vita di ogni partita (creata/avviata/finita/annullata): parametri,
+    giocatori, punteggio finale, vincitore, durata, abbandoni;
+  - **`moves`** — un tentativo di parola con la fonte del verdetto (`DB`/`MORF`/`AI`), il
+    motivo del rifiuto, la durata della chiamata AI e il numero di tentativo;
+  - **`npm run db:stats`** (`--days=N`, `--json`, `--words=N`): partite e durate,
+    distribuzione delle fonti di validazione, % di ricorso al fallback AI, motivi di
+    rifiuto, serie giornaliera e parole che hanno raggiunto l'AI (candidati per il
+    dizionario). Eseguibile anche nel container:
+    `docker compose exec app npm run db:stats`.
+- Scritture **fire-and-forget** dal `GameManager`: non rallentano il game loop e un errore DB
+  viene loggato al massimo una volta al minuto.
+
+### Changed
+- `db/init-db.sql`: nuova tabella `moves`, colonna `games.abandonments` (ALTER idempotente),
+  `game_logs` marcata come legacy/non usata.
+- **Privacy**: il testo della parola viene salvato solo per le mosse che raggiungono l'AI
+  (i candidati utili per ampliare il dizionario); le mosse normali non persistono il testo,
+  coerentemente con la regola 8.C.
+
 ## [1.8.3] — 2026-11-11
 
 ### Fixed
