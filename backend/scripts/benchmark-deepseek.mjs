@@ -33,7 +33,7 @@ const TIMEOUT_MS = parseInt(argMap.timeout || '10000', 10);
 
 const API_KEY = process.env.DEEPSEEK_API_KEY;
 const API_URL = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions';
-const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-flash';
 
 if (!API_KEY || API_KEY.startsWith('sk-INSERISCI')) {
   console.error('❌ DEEPSEEK_API_KEY mancante o placeholder in .env');
@@ -76,8 +76,11 @@ async function singolaChiamata(parola) {
             content: `La parola italiana "${parola}" esiste come parola di senso compiuto? Rispondi solo YES o NO.`,
           },
         ],
-        max_tokens: 4,
+        // Allineato a backend/src/ai/deepseekClient.js (reference API 2026-11)
+        thinking: { type: 'disabled' },
+        max_tokens: 8,
         temperature: 0,
+        stop: ['\n', '.', ',', ';'],
       }),
       signal: controller.signal,
     });
@@ -90,8 +93,16 @@ async function singolaChiamata(parola) {
     }
 
     const data = await response.json();
-    const testoRisposta = data.choices?.[0]?.message?.content?.trim().toUpperCase() ?? '';
-    const valida = testoRisposta === 'YES';
+    const choice = data.choices?.[0] ?? null;
+    const testoRisposta = (choice?.message?.content ?? '').trim().toUpperCase();
+    // Come il client di gioco: conta la prima parola, così un eventuale
+    // seguito ("YES, ...") non falsa la misura.
+    const primaParola = testoRisposta.replace(/[^A-ZÀ-Ù\s]/g, ' ').trim().split(/\s+/)[0] ?? '';
+    const finishReason = choice?.finish_reason ?? null;
+    if (finishReason !== 'stop') {
+      return { durataMs, valida: null, errore: `finish_reason=${finishReason}`, risposta: testoRisposta };
+    }
+    const valida = primaParola === 'YES' || primaParola === 'SÌ' || primaParola === 'SI';
 
     return { durataMs, valida, errore: null, risposta: testoRisposta };
   } catch (err) {

@@ -149,6 +149,36 @@
   seed 185.723 parole in 2,0 s, secondo avvio no-op, `/health` ok, frontend 200,
   gioco e2e 11/11 (parola valida da DB `source=LO`, inventata respinta), `npm test` 64/64
 
+### Fix fallback AI DeepSeek — modello, thinking e `finish_reason` (1.8.3)
+- [x] **Bug latente (silenzioso)**: `DEEPSEEK_MODEL=deepseek-chat` è un alias
+  **ritirato** (changelog DeepSeek 2026-04-24: dismissione prevista per il
+  2026-07-24). Un errore HTTP sul fallback AI veniva interpretato da `Validator`
+  come `ai_errore` → **parola rifiutata**: la degradazione era invisibile.
+- [x] `config.js`: default `deepseek-flash` + `normalizzaModello()` che rimappa gli
+  alias ritirati (`deepseek-chat`, `deepseek-reasoner` → `deepseek-flash`) con
+  warning `deepseek_model_alias_ritirato`; nomi sconosciuti passati così come sono
+  (errore esplicito dall'API, niente default silenzioso)
+- [x] `ai/deepseekClient.js`: body allineato alla reference 2026-11 —
+  `thinking: {type:"disabled"}` (in v4 il thinking è **attivo di default** e
+  brucerebbe `max_tokens`, rendendo inefficace `temperature`), `max_tokens` 4→8,
+  `stop: ["\n", ".", ",", ";"]`, `temperature: 0`, `stream: false`
+- [x] **`finish_reason` gestito**: solo `stop` è un verdetto valido; `length`,
+  `content_filter`, `insufficient_system_resource`, `aborted` sono **errori
+  transitori** (retry), MAI un "NO" silenzioso. Risposta vuota/non interpretabile
+  → errore, non rifiuto della parola
+- [x] Parsing più tollerante: conta la PRIMA parola dopo la normalizzazione
+  (`"Sì, esiste."` → valida), invece dell'uguaglianza esatta che scartava parole valide
+- [x] `Validator`: messaggio `ai_errore` ripulito dal dettaglio tecnico (resta nei log)
+- [x] Nuovo `backend/scripts/check-deepseek.mjs`: `GET /v1/models` + (con `--live`)
+  due chiamate reali con il body del gioco (parola valida e non) → content,
+  `finish_reason`, latenza, token. Eseguibile nel container
+  (`docker compose exec app node …`): `backend/scripts` ora NON è più escluso da
+  `.dockerignore` (come gli script di `db/`)
+- [x] Test: `backend/tests/deepseekClient.test.js` (10 test, fetch mockato) —
+  body, `finish_reason`, content vuoto/non riconosciuto, HTTP 500 + retry,
+  rimappatura alias. Suite: **74 test** (60 pass + 14 skip e2e senza stack)
+- [x] `VERSION` + `package.json` → **1.8.3** (base `1.8.2`)
+
 ### Post-M5 (opzionali / rifiniture)
 - [x] Test Playwright multi-context a 4 giocatori: 4 contesti isolati (Alice/Bob/Carlo/Diana) → stessa parola per tutti, ognuno vede i 4 giocatori, nessun conflitto localStorage
 - [x] Rifiniture audio: envelope anti-click, `success()` come arpeggio di Do maggiore, `buzzer()` a due toni, `tick()`/`click()` con forme d'onda dedicate
@@ -212,12 +242,16 @@ M7 (Docker):           [██████████] 100%  ✅ COMPLETATA lat
 |---|---|---|---|---|---|
 | Parole nel DB | 539.780 → sostituite | - | - | 185.723 ✅ | 185.723 (cotte in immagine) ✅ |
 | Performance query | 45.84ms ✅ | - | - | - | - |
-| Test unit | - | 28/28 ✅ | 28/28 ✅ | 27/27 ✅ | 64/64 (con e2e socket) ✅ |
+| Test unit | - | 28/28 ✅ | 28/28 ✅ | 27/27 ✅ | 64/64 (con e2e socket) ✅ · **88** in 1.8.3 (10 nuovi client DeepSeek; 72 pass / 16 skip) |
 | Smoke E2E | - | PASS | PASS | PASS | PASS (create→join→ready→submit) |
 | AI integrata | - | - | ✅ | - | - |
 | Latenza AI media | - | - | 343ms | 370ms | - |
 
 ## 🐛 Issue Aperte
+- **DeepSeek in produzione (1.8.3)**: aggiornare il `.env` del server a
+  `DEEPSEEK_MODEL=deepseek-flash` (o rimuovere la riga: il default è già corretto)
+  e verificare con `docker compose exec app node backend/scripts/check-deepseek.mjs --live`
+  (richiede ricostruzione immagine per includere `backend/scripts`).
 - **MCP filesystem**: config già aggiornata per includere `/home/death/paroleMutanti`; **serve riavvio di Cline** (o "Retry" sul banner) perché diventi effettivo.
 - **Verifica sul server (M7)**: ✅ **SUPERATA e CHIUSA il 2026-09-30** — due container `healthy`,
   `/health` ok (v1.6.0), seed 185.723 parole, `db:check` e `--force` ok; evidenze in

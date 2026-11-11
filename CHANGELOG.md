@@ -3,6 +3,33 @@
 Modifiche rilevanti del progetto. Formato ispirato a [Keep a Changelog](https://keepachangelog.com/it/1.1.0/);
 versioning [SemVer](https://semver.org/lang/it/). `VERSION` e `package.json` restano allineati.
 
+## [1.8.3] — 2026-11-11
+
+### Fixed
+- **Fallback AI DeepSeek potenzialmente inerte in produzione**: `DEEPSEEK_MODEL=deepseek-chat`
+  è un alias ritirato (changelog DeepSeek: dismissione prevista per il 2026-07-24, non più tra i
+  valori ammessi dalla Chat Completions API). Un errore HTTP su quel percorso veniva interpretato
+  dal `Validator` come "parola non valida", quindi il degrado era invisibile ai giocatori. Ora la
+  config usa `deepseek-flash` e **rimappa automaticamente** gli alias ritirati
+  (`deepseek-chat`/`deepseek-reasoner`) con un warning nei log.
+- **`finish_reason` ignorato**: `length`, `content_filter`, `insufficient_system_resource` e
+  `aborted` venivano trattati come un "NO". Ora sono errori transitori (con retry) e non
+  rifiutano la parola.
+- **Parsing troppo rigido**: risposte come `"Sì, esiste."` venivano scartate; ora conta la prima
+  parola.
+
+### Changed
+- Richiesta DeepSeek allineata alla reference API: `thinking: {type:"disabled"}` esplicito (in v4
+  il thinking è attivo di default e brucerebbe `max_tokens`, rendendo inefficace `temperature`),
+  `max_tokens` 4→8, `stop: ["\n", ".", ",", ";"]`, log dei token usati.
+- Messaggio `ai_errore` ripulito dal dettaglio tecnico (resta nei log).
+
+### Added
+- **`backend/scripts/check-deepseek.mjs`**: verifica il modello configurato (`GET /v1/models`) e,
+  con `--live`, esegue due chiamate reali con il body del gioco. Eseguibile nel container:
+  `docker compose exec app node backend/scripts/check-deepseek.mjs --live`.
+- `backend/tests/deepseekClient.test.js`: 10 test con `fetch` mockato.
+
 ## [1.8.2] — 2026-10-13
 
 ### Fixed

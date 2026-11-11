@@ -53,7 +53,10 @@ playwright.config.js
 playwright-report
 test-results
 backend/tests
-backend/scripts
+# backend/scripts NON è escluso: gli script di manutenzione (check/benchmark
+# DeepSeek) restano nell'immagine per poterli eseguire nel container, dove ci
+# sono le dipendenze ma non un'installazione Node sull'host — come già accade
+# per gli script di manutenzione in db/.
 **/*.md
 *.md
 

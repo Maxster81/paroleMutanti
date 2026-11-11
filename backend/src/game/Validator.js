@@ -177,7 +177,8 @@ export async function validaMossa({ parolaPrecedente, parolaNuova, gameId, parol
       motivo: 'ai_errore',
       normalizzata,
       source: null,
-      messaggio: `Parola "${normalizzata}" non nel dizionario. AI non disponibile: ${risultatoAi.errore}`,
+      // Dettaglio tecnico solo nei log (regola 8.C): al giocatore non serve.
+      messaggio: `Parola "${normalizzata}" non nel dizionario. Verifica AI non disponibile: riprova tra qualche secondo.`,
     };
   }
 

@@ -71,6 +71,44 @@ function validaConfig(cfg) {
   }
 }
 
+// --- Modelli DeepSeek --------------------------------------------------------
+// Valori ammessi dalla Chat Completions API (reference 2026-11):
+// https://api-docs.deepseek.com/api/create-chat-completion
+const MODELLI_DEEPSEEK_VALIDI = ['deepseek-flash', 'deepseek-v4-pro'];
+
+// Alias ritirati: `deepseek-chat` (e `deepseek-reasoner`) non compaiono più tra
+// i valori ammessi. Li mappiamo sul successore per non restare con un fallback
+// AI che fallisce in silenzio: un errore HTTP viene interpretato da Validator
+// come "parola non valida", quindi l'impatto sarebbe invisibile ai giocatori.
+const ALIAS_MODELLI_DEEPSEEK = {
+  'deepseek-chat': 'deepseek-flash',
+  'deepseek-reasoner': 'deepseek-flash',
+};
+
+/**
+ * Normalizza il nome del modello DeepSeek: mappa gli alias ritirati e avvisa
+ * per i nomi sconosciuti (che vengono comunque passati all'API, che risponderà
+ * con un errore esplicito).
+ *
+ * @param {string} modello - valore grezzo da env
+ * @returns {string} nome del modello da inviare all'API
+ */
+function normalizzaModello(modello) {
+  const richiesto = String(modello).trim().toLowerCase();
+  if (MODELLI_DEEPSEEK_VALIDI.includes(richiesto)) return richiesto;
+
+  const mappato = ALIAS_MODELLI_DEEPSEEK[richiesto];
+  if (mappato) {
+    logger.warn('deepseek_model_alias_ritirato', { richiesto, usato: mappato });
+    return mappato;
+  }
+
+  if (richiesto) {
+    logger.warn('deepseek_model_sconosciuto', { modello: richiesto });
+  }
+  return richiesto;
+}
+
 /**
  * Esporta l'oggetto di configurazione validato.
  */
@@ -95,7 +133,7 @@ export const config = (() => {
     deepseek: {
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       apiUrl: process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions',
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      model: normalizzaModello(process.env.DEEPSEEK_MODEL || 'deepseek-flash'),
       rateLimitPerMin: toInt(process.env.DEEPSEEK_RATE_LIMIT_PER_MIN, 10, 1, 100),
       enabled: toBool(process.env.DEEPSEEK_ENABLED ?? 'true'),
     },

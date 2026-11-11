@@ -67,6 +67,22 @@ seed 185.723 parole in 2,0 s, secondo avvio no-op, `/health` ok, partita e2e 11/
 `npm test` 64/64. **Verifica sul server: a cura dell'utente** (Docker non disponibile
 in sandbox).
 
+**🤖 Fallback AI — hardening API DeepSeek (2026-11-11, versione `1.8.3`, su `main`
+con base `1.8.2`)**: `DEEPSEEK_MODEL=deepseek-chat` è un alias
+**ritirato** (changelog DeepSeek 2026-04-24 → dismissione 2026-07-24) e un errore
+HTTP sul fallback veniva letto da `Validator` come "parola non valida" (degrado
+silenzioso). Fix: default `deepseek-flash` + rimappatura automatica degli alias
+ritirati in `config.js` (con warning), `thinking: {type:"disabled"}` esplicito
+(in v4 il thinking è attivo di default e brucerebbe `max_tokens`, rendendo
+inefficace `temperature`), `max_tokens` 4→8 + `stop`, gestione di `finish_reason`
+(solo `stop` = verdetto; `length`/`content_filter`/`insufficient_system_resource`
+= errore transitorio ritentato, mai "NO"), parsing tollerante (prima parola).
+Aggiunti 10 test con `fetch` mockato (`backend/tests/deepseekClient.test.js`) e
+`backend/scripts/check-deepseek.mjs` (`GET /v1/models` + `--live`). **Da fare in
+produzione**: aggiornare `.env` (`DEEPSEEK_MODEL=deepseek-flash`, o rimuovere la
+riga) e lanciare lo script di verifica nel container. Prossimo passo concordato:
+esperimento `logprobs`/`top_logprobs` per un punteggio di confidenza (rimandato).
+
 **Stato progetto**: M1 ✅ M2 ✅ M3 ✅ M4b ✅ — Frontend M4+M5 completato. Bug fix M5 conclusi (desincronizzazione `3437de2`, **M5c anti-ripetizione + elenco parole**, **validazione a tre fasi DB+morfologia+AI**). **M6 Deploy completato e live** (`parolemutanti.maxster.top`, ora percorso storico). **Audit regola 08 eseguito (1.3.3)**: fix CORS prod, validazioni server-side mancanti, parole rimosse dai log, `broadcastAPartita` su room, `.env.example` completato; aggiunti **test di integrazione GameManager** e **test e2e socket**.
 
 **🔧 Fix critico (deploy, storico)**: risolto il bug che bloccava l'avvio in produzione — `SESSION_SECRET < 32` era un **path-mismatch** in `backend/src/config.js` riga 52 (`cfg.sessionSecret` invece di `cfg.security.sessionSecret`). Causa: `validaConfig` leggeva dal livello sbagliato → errore SEMPRE in produzione. Fix: riga 52 → `cfg.security.sessionSecret`. **✅ Deploy riuscito**: server `/health` risponde `{"status":"ok","version":"1.2.9","database":"ok","env":"production"}` — app online, restart loop risolto.

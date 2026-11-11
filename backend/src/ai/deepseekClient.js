@@ -9,6 +9,14 @@
  * - p95: ~980ms (prima chiamata cold start)
  * - Timeout: 1500ms (sicuro + margine)
  *
+ * Allineato alla Chat Completions API DeepSeek (reference 2026-11):
+ * - `thinking` è **attivo di default**: qui va disabilitato esplicitamente,
+ *   altrimenti il budget di `max_tokens` finisce in catena di pensiero
+ *   (`finish_reason: "length"`, `content` vuoto) e `temperature` è inefficace.
+ * - `stop` chiude la generazione appena il modello risponde (meno token, meno
+ *   rischio di preamboli).
+ * - `finish_reason` diverso da `stop` NON è un "NO": è un errore transitorio.
+ *
  * @module backend/src/ai/deepseekClient
  */
 
@@ -17,6 +25,14 @@ import { logger } from '../logger.js';
 
 const TIMEOUT_MS = 1500; // basato su benchmark
 const MAX_RETRIES = 1;
+
+// YES/NO è 1 token: 8 lascia margine a eventuali prefissi senza rischiare il
+// troncamento (con 4 un preambolo produce content vuoto / 'length').
+const MAX_TOKENS = 8;
+const STOP_SEQUENCES = ['\n', '.', ',', ';'];
+
+const RISPOSTE_VALIDE = new Set(['yes', 'sì', 'si']);
+const RISPOSTE_NON_VALIDE = new Set(['no']);
 
 /**
  * Costruisce il prompt per chiedere se una parola è italiana valida.
@@ -38,10 +54,34 @@ function buildPrompt(parola) {
 }
 
 /**
+ * Interpreta il testo restituito dal modello.
+ *
+ * Tollerante su punteggiatura e su un eventuale seguito ("Sì, esiste"): conta
+ * la PRIMA parola. In questo modo non si rischia di rifiutare una parola valida
+ * solo perché il modello ha aggiunto una virgola.
+ *
+ * @param {string|null|undefined} testo
+ * @returns {boolean|null} true=valida, false=non valida, null=non interpretabile
+ */
+function interpretaRisposta(testo) {
+  const primaParola = String(testo ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\s]/gu, ' ') // punteggiatura/numeri → spazio (unicode-safe)
+    .trim()
+    .split(/\s+/)[0];
+
+  if (!primaParola) return null;
+  if (RISPOSTE_VALIDE.has(primaParola)) return true;
+  if (RISPOSTE_NON_VALIDE.has(primaParola)) return false;
+  return null;
+}
+
+/**
  * Esegue una singola chiamata API a DeepSeek.
  *
  * @param {string} parola
- * @returns {Promise<{valida: boolean, risposta: string, durataMs: number}>}
+ * @returns {Promise<{valida: boolean, risposta: string, durataMs: number, tokens: object|null}>}
  */
 async function chiamaDeepSeek(parola) {
   const inizio = Date.now();
@@ -58,8 +98,11 @@ async function chiamaDeepSeek(parola) {
       body: JSON.stringify({
         model: config.deepseek.model,
         messages: buildPrompt(parola),
-        max_tokens: 4,
+        // Thinking mode OFF: risposta secca, latenza bassa, temperature efficace.
+        thinking: { type: 'disabled' },
+        max_tokens: MAX_TOKENS,
         temperature: 0,
+        stop: STOP_SEQUENCES,
         stream: false,
       }),
       signal: controller.signal,
@@ -74,16 +117,36 @@ async function chiamaDeepSeek(parola) {
     }
 
     const data = await response.json();
-    const testoRisposta = (data.choices?.[0]?.message?.content ?? '').trim();
+    const choice = data.choices?.[0] ?? null;
+    const finishReason = choice?.finish_reason ?? null;
 
-    // Normalizza: accettiamo risposte univoche YES / SÌ / SI (inglese o
-    // italiano, con eventuale punteggiatura "SÌ.", "si", ecc.). La lingua non
-    // importa purché il significato sia inequivocabile.
-    const valida = ['yes', 'sì', 'si'].includes(
-      testoRisposta.toLowerCase().replace(/[^a-zà-ù]/g, '')
-    );
+    // Solo `stop` garantisce che il contenuto sia la risposta completa.
+    // `length` (budget esaurito), `content_filter`, `insufficient_system_resource`
+    // e `aborted` non significano "parola non valida": vanno trattati come
+    // errore transitorio (e ritentati), mai come un NO silenzioso.
+    if (finishReason !== 'stop') {
+      throw new Error(`risposta_non_completa (finish_reason=${finishReason ?? 'assente'})`);
+    }
 
-    return { valida, risposta: testoRisposta.toUpperCase(), durataMs };
+    const testoRisposta = (choice?.message?.content ?? '').trim();
+    const interpretazione = interpretaRisposta(testoRisposta);
+
+    // Risposta illeggibile → errore esplicito, NON "parola non valida".
+    if (interpretazione === null) {
+      throw new Error(`risposta_non_riconosciuta: "${testoRisposta.slice(0, 40)}"`);
+    }
+
+    const usage = data.usage ?? {};
+
+    return {
+      valida: interpretazione,
+      risposta: testoRisposta.toUpperCase(),
+      durataMs,
+      tokens: {
+        prompt: usage.prompt_tokens ?? null,
+        completion: usage.completion_tokens ?? null,
+      },
+    };
   } catch (err) {
     clearTimeout(timer);
     const durataMs = Date.now() - inizio;
@@ -96,7 +159,7 @@ async function chiamaDeepSeek(parola) {
 
 /**
  * Verifica se una parola è italiana valida tramite DeepSeek.
- * Con retry 1 volta in caso di errore transitorio (timeout, 5xx).
+ * Con retry 1 volta in caso di errore transitorio (timeout, 5xx, risposta incompleta).
  *
  * @param {string} parola - parola da verificare (già normalizzata lowercase)
  * @returns {Promise<{valida: boolean, risposta: string, durataMs: number, errore: string|null}>}
@@ -118,6 +181,8 @@ export async function verificaParolaAI(parola) {
         durataMs: r.durataMs,
         valida: r.valida,
         tentativo: tentativo + 1,
+        tokens_prompt: r.tokens?.prompt ?? null,
+        tokens_completion: r.tokens?.completion ?? null,
       });
       return { valida: r.valida, risposta: r.risposta, durataMs: r.durataMs, errore: null };
     } catch (err) {

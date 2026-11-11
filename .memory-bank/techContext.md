@@ -96,6 +96,12 @@ npm run db:reset       # DROP + ricrea schema (ATTENZIONE)
 - `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` — credenziali del container
   `db` (obbligatorie per lo stack Docker)
 - `DEEPSEEK_API_KEY` — chiave API DeepSeek (vuota = fallback AI disattivato)
+- `DEEPSEEK_MODEL` — modello DeepSeek (default `deepseek-flash`; ammessi
+  `deepseek-flash`/`deepseek-v4-pro`). Gli alias ritirati `deepseek-chat` e
+  `deepseek-reasoner` vengono rimappati su `deepseek-flash` da `config.js` con
+  warning nei log. Il client invia `thinking: {type:"disabled"}` (in v4 il
+  thinking è attivo di default) e gestisce `finish_reason` come errore
+  transitorio, mai come "parola non valida".
 - `PORT` — porta backend (default 8081; in Docker imposta dal compose)
 - `HOST` — bind (dev `0.0.0.0`; container `0.0.0.0`; bare-metal `127.0.0.1`)
 - `NODE_ENV` — development | production (nel container forzato a `production`)
