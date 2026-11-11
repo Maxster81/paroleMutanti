@@ -43,6 +43,10 @@ for (const arg of args) {
   if (m) argMap[m[1]] = m[2];
 }
 const SAMPLES = Math.max(0, parseInt(argMap.samples ?? '2', 10) || 0);
+// Temperatura della chiamata "base" (quella con i logprobs). A 0 le
+// distribuzioni DeepSeek risultano degeneri (P=1 sul token scelto), quindi
+// l'esperimento può essere ripetuto a temp 1: lì le probabilità sono "vere".
+const TEMPERATURA = Math.min(2, Math.max(0, parseFloat(argMap.temp ?? '0') || 0));
 const DEBUG = args.includes('--debug');
 const SALVA = !args.includes('--no-save');
 
@@ -191,6 +195,9 @@ function leggiDistribuzione(json) {
 
   return {
     verdetto: classificaToken(voce.token),
+    // Decisione presa sulla distribuzione (non sul token campionato): è il
+    // verdetto usabile a temperature > 0, dove il token estratto è casuale.
+    verdettoProb: denom > 0 ? (pYesN >= 0.5 ? 'yes' : 'no') : 'altro',
     token: voce.token,
     pYes: pYesN,
     pNo: pNoN,
@@ -201,7 +208,7 @@ function leggiDistribuzione(json) {
 }
 
 async function analizza(parola) {
-  const r = await richiesta(parola, 0);
+  const r = await richiesta(parola, TEMPERATURA);
   if (!r.ok) return { errore: `HTTP ${r.status}: ${r.testo.slice(0, 200)}` };
 
   const dist = leggiDistribuzione(r.json);
@@ -216,7 +223,7 @@ async function analizza(parola) {
     const d = leggiDistribuzione(s.json);
     if (!d) continue;
     campioni.push(classificaToken(d.token));
-    if (campioni[campioni.length - 1] === dist.verdetto) accordi++;
+    if (campioni[campioni.length - 1] === dist.verdettoProb) accordi++;
   }
 
   return {
@@ -237,7 +244,7 @@ async function main() {
   }
 
   // Preflight: senza chiave/saldo validi non ha senso fare 26+ chiamate.
-  const preflight = await richiesta('cane', 0);
+  const preflight = await richiesta('cane', TEMPERATURA);
   if (!preflight.ok) {
     console.error(`❌ API non utilizzabile (HTTP ${preflight.status}): ${preflight.testo.slice(0, 300)}`);
     process.exit(1);
@@ -246,7 +253,9 @@ async function main() {
   console.log('🧪 Esperimento logprobs — confidenza del verdetto DeepSeek');
   console.log(`   Modello: ${MODEL} (dal .env: ${MODELLO_RICHIESTO})`);
   console.log(`   Parole: ${DATASET.length} · campioni di consistenza per parola: ${SAMPLES}`);
-  console.log(`   Body: thinking=disabled · max_tokens=1 · temperature=0 · top_logprobs=${TOP_LOGPROBS}`);
+  console.log(
+    `   Body: thinking=disabled · max_tokens=1 · temperature=${TEMPERATURA} · top_logprobs=${TOP_LOGPROBS}`,
+  );
   console.log('');
 
   const risultati = [];
@@ -262,14 +271,16 @@ async function main() {
       continue;
     }
 
-    const verdettoValido = a.verdetto === 'yes';
-    const corretto = a.verdetto === 'altro' ? null : verdettoValido === (atteso === 'valida');
+    // Verdetto = argmax tra YES e NO sulla distribuzione del primo token.
+    const verdetto = a.verdettoProb;
+    const corretto = verdetto === 'altro' ? null : (verdetto === 'yes') === (atteso === 'valida');
 
     risultati.push({
       parola,
       atteso,
       nota: nota ?? null,
-      verdetto: a.verdetto,
+      verdetto,
+      verdetto_token: a.verdetto,
       token: a.token,
       p_yes: a.pYes,
       p_no: a.pNo,
@@ -280,7 +291,9 @@ async function main() {
 
     if (DEBUG) {
       console.log('');
-      console.log(`   ${parola} · token="${a.token}" · verdetto=${a.verdetto} · margine=${formatP(a.margine)}`);
+      console.log(
+        `   ${parola} · token="${a.token}" (${a.verdetto}) · verdetto_prob=${a.verdettoProb} · margine=${formatP(a.margine)}`,
+      );
       console.log(
         '   top: ' +
           a.top
@@ -382,6 +395,7 @@ async function main() {
       timestamp: new Date().toISOString(),
       modello: MODEL,
       max_tokens: 1,
+      temperatura: TEMPERATURA,
       top_logprobs: TOP_LOGPROBS,
       samples_consistenza: SAMPLES,
       sintesi: {
